@@ -52,8 +52,6 @@ aggregateExpression <- function(training_directory, perturbation = NULL) {
     
 }
 
-
-
 #' imputeExpression
 #' 
 #'  This function imputes missing values in the gene expression matrix randomly. 
@@ -68,3 +66,39 @@ imputeExpression <- function(expression_matrix) {
     expression_matrix[is.na(expression_matrix)] <- abs(rnorm(sum(is.na(expression_matrix)), exp_mean, exp_sd))
     return(expression_matrix)
 }
+
+
+#' aggregateNetworks
+#' 
+#'  This function reads in the gene regulatory networks used to create the simulated expression data. . 
+#'
+#' @import igraph
+#' @import dplry
+#' @param gold_standards_directory Directory where the gold standard networks exist. Gold standard networks are edgelists with the format (G1	G2	1)
+#' @return network Aggregated network
+#' @export
+aggregateNetworks <- function(gold_standards_directory) {
+    
+    files <- list.files(gold_standards_directory)
+    files <- files[!(grepl("Bonus",files))]
+
+    network <- data.frame()
+    for(file in files) {
+        file_name <- paste0(gold_standards_directory,"/",file)
+        subtype <- sub(".*_size10_(\\d+)_.*", "\\1", file)
+        single_net <- read.delim(file_name, header = F)
+        single_net$V1 <- paste0(single_net$V1,subtype)
+        single_net$V2 <- paste0(single_net$V2,subtype)
+        names(single_net) <- c("from", "to", "weight")
+        single_graph <- graph_from_data_frame(single_net, directed = TRUE)
+
+        single_adjacency <- as.data.frame(as_adjacency_matrix(single_graph,sparse =F, attr = "weight"))
+
+        network <- bind_rows(network,single_adjacency)
+        
+    }
+
+    network[is.na(network)] <- 0
+    print(network)
+}
+
