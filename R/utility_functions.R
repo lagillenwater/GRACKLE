@@ -1,0 +1,14 @@
+## Miscelaneous utility functions
+
+
+#' min_max_scale
+#' 
+#'  min_max_scale is a function for scaling a vetor of values between 0 and 1
+#'
+#' @param x numerical vector
+#' @return scaled min max scaled numerical vector
+#' @export
+min_max_scale <- function(x) {
+    scaled <- (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))
+  return(scaled)
+}
