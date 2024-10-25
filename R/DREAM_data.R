@@ -30,7 +30,7 @@ aggregateExpression <- function(training_directory, perturbation = NULL) {
             file_name <- paste0(dir,"/",file)
             subtype <- sub(".*_size10_(\\d+)_.*", "\\1", file)
             single_exp <- read.delim(file_name)
-            names(single_exp) <- paste0(names(single_exp),subtype)
+            names(single_exp) <- paste0(names(single_exp),".",subtype)
             expression <- bind_rows(expression, single_exp)
             
 
@@ -44,8 +44,11 @@ aggregateExpression <- function(training_directory, perturbation = NULL) {
     names(metadata) <- "subgroup"
     data_rownames <- paste0("S",1:nrow(expression))
 
+    metadata <- model.matrix(~subgroup-1, metadata)
+    
     rownames(expression) <- data_rownames
     rownames(metadata) <- data_rownames
+
 
     return(list(expression = expression, metadata = metadata))
     
@@ -87,8 +90,8 @@ aggregateNetworks <- function(gold_standards_directory) {
         file_name <- paste0(gold_standards_directory,"/",file)
         subtype <- sub(".*_size10_(\\d+)_.*", "\\1", file)
         single_net <- read.delim(file_name, header = F)
-        single_net$V1 <- paste0(single_net$V1,subtype)
-        single_net$V2 <- paste0(single_net$V2,subtype)
+        single_net$V1 <- paste0(single_net$V1,".",subtype)
+        single_net$V2 <- paste0(single_net$V2,".",subtype)
         names(single_net) <- c("from", "to", "weight")
         single_graph <- graph_from_data_frame(single_net, directed = TRUE)
 
@@ -99,6 +102,6 @@ aggregateNetworks <- function(gold_standards_directory) {
     }
 
     network[is.na(network)] <- 0
-    print(network)
+    return(network)
 }
 
