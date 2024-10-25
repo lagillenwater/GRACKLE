@@ -73,7 +73,7 @@ imputeExpression <- function(expression_matrix) {
 #'  This function reads in the gene regulatory networks used to create the simulated expression data. . 
 #'
 #' @import igraph
-#' @import dplry
+#' @import dplyr
 #' @param gold_standards_directory Directory where the gold standard networks exist. Gold standard networks are edgelists with the format (G1	G2	1)
 #' @return network Aggregated network
 #' @export
