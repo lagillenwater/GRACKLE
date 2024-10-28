@@ -12,9 +12,9 @@ aggregateExpression(training_directory, perturbation = NULL)
 \item{perturbation}{The in silico perturbation condition. Default is NULL, in which case all perturbation conditions are combined. Other options include "wildtype", "knockdown", "knockouts", and "multifactorial"}
 }
 \value{
-expression Aggregate expression dataset
-
-metadata Aggregate metadata labels
+A list containing the following components:
+\item{expression}{Aggregate expression dataset}
+\item{metadata}{Aggregate metadata labels}
 }
 \description{
 This function reads in the simulated expression profiles from the DREAM4 challenge. Depending on the perturbation parameter, it will read in a single data type or all available.

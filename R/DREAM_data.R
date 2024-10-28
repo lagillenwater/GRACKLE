@@ -7,8 +7,9 @@
 #' @import dplyr
 #' @param training_directory Path to the input directory of training data
 #' @param perturbation The in silico perturbation condition. Default is NULL, in which case all perturbation conditions are combined. Other options include "wildtype", "knockdown", "knockouts", and "multifactorial"
-#' @return expression Aggregate expression dataset
-#' @return metadata Aggregate metadata labels
+#' @return A list containing the following components:
+#' \item{expression}{Aggregate expression dataset}
+#' \item{metadata}{Aggregate metadata labels}
 #' @export
 aggregateExpression <- function(training_directory, perturbation = NULL) {
     ## find the files in the directory

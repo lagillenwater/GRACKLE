@@ -11,7 +11,9 @@ Encoding: UTF-8
 Imports:
 	dplyr,
 	igraph,
-	Rcpp
+	Rcpp,
+	nnls,
+	glmnet
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)
