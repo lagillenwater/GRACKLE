@@ -52,17 +52,26 @@ categoricalPrediction <- function(W_test,test_metadata){
 #'
 #' @param H_train Matrix of trained H matrix
 #' @param module_size Size of consecutive modules for DREAM simulations.
+#' @return top A list of the module score. 
 #' @export
 
 geneLoadingsEvaluation <- function(H_train, module_size = 10) {
     n_genes <- ncol(H_train)
     lower_bound <- seq(1,n_genes,module_size)
     upper_bound <- lower_bound + module_size -1
+    n_modules <- length(lower_bound)
 
-    module_scores <- lapply(1:length(lower_bound), function(i) {
+    ## calculate the module scores
+    module_scores <- lapply(1:n_modules, function(i) {
         rowSums(H_train[,lower_bound[i]:upper_bound[i]])
     })
+
+    ## top modules
+    top <- lapply(module_scores, function(x) {
+        names(x)[x == max(x)]
+    })
+    names(top) <- paste0("subgroup",1:n_modules)
     
-    return(module_scores)
+    return(list(module_scores = module_scores, top = top))
 
 }
