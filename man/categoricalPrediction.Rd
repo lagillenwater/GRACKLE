@@ -11,6 +11,9 @@ categoricalPrediction(W_test, test_metadata)
 
 \item{test_metadata}{Matrix of test metadata}
 }
+\value{
+nonzero Named list of nonzero coefficients by subgroup prediction
+}
 \description{
 Function for predicting categorical labels in test data
 }

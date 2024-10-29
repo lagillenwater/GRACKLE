@@ -9,8 +9,6 @@ project_W(test_data, H_train, k)
 \arguments{
 \item{H_train}{Matrix of trained H matrix}
 
-\item{k}{numerical value for the chosen k}
-
 \item{test_expression}{Data.frame of test expression data}
 }
 \value{

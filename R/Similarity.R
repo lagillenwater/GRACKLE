@@ -12,7 +12,8 @@ similarity_calc <- function(input_matrix) {
         stop("Error: Input is not a matrix.")
           }
     
-    distance <- euclideanDist(input_matrix)
+    distance <- as.matrix(dist(input_matrix, method = "euclidean"))
+    #similarity <- 1 / (1 + as.matrix(distance))
     similarity <- exp(-distance)
     colnames(similarity) <- rownames(input_matrix)
     rownames(similarity) <- rownames(input_matrix)

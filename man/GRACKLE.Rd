@@ -12,7 +12,7 @@ GRACKLE(
   lambda_1 = 0.5,
   lambda_2 = 0.5,
   k = 5,
-  learning_rate = 0.01
+  verbose = FALSE
 )
 }
 \arguments{
@@ -30,7 +30,7 @@ GRACKLE(
 
 \item{k}{An integer specifying the number of clusters or components. Default is 5.}
 
-\item{learning_rate}{A numeric value indicating the learning rate for the algorithm. Default is 0.01.}
+\item{verbose}{A boolean value as to whether to print loss error or not. Default is FALSE.}
 }
 \value{
 A list containing the following components:

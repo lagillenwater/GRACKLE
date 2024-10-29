@@ -7,34 +7,62 @@
 #' @import glmnet
 #' @param W_test Matrix of projected W from test expression
 #' @param test_metadata Matrix of test metadata
+#' @return nonzero Named list of nonzero coefficients by subgroup prediction
 #' @export
 categoricalPrediction <- function(W_test,test_metadata){
     
-    ## W_test <- as.data.frame(W_test)
     test_metadata <- as.data.frame(test_metadata)
-
+        
     ## Fit penalized logistic regression models for each outcome
     models <- lapply(colnames(test_metadata), function(outcome) {
         y <- as.matrix(test_metadata[[outcome]])
-        cv.glmnet(W_test, y, family = "binomial", alpha = 1)  # alpha = 1 for Lasso, alpha = 0 for Ridge
-        })
-    ## Fit logistic regression models for each outcome
-    ## models <- lapply(names(test_metadata), function(outcome) {
-    ##     glm(as.formula(paste(outcome, "~ .")), data = cbind(test_metadata[outcome], W_test), family = binomial)
-    ## })
-    
-    ## Predict probabilities for each outcome
-    predicted_probabilities <- lapply(models, function(model) {
-        predict(model, newx = as.matrix(test_metadata), type = "response", s = model$lambda.min)
+        cv.glmnet(W_test, y,  alpha = 1, intercept = F, lower.limit = 0, stadardize = T)  # alpha = 1 for Lasso, alpha = 0 for Ridgee
     })
 
-    ## Combine predicted probabilities into a data frame
-    predicted_probabilities_df <- do.call(cbind, predicted_probabilities)
-    #colnames(predicted_probabilities_df) <- names(test_metadata)
+    
+    ## coefficients
+    coefficients <- lapply(models, function(model) {
+        coef(model, s = model$lambda.min)
+        
+    })
 
-    ## Print predicted probabilities
-    print(predicted_probabilities_df)
-    return(models)
+    ## nonzero coefficients
+    nonzero <- lapply(coefficients, function(x) {
+        rownames(x)[x[,1] != 0]
+        
+    })
+    names(nonzero) <- names(test_metadata)
+
+    ## top coefficient
+    top <- lapply(coefficients, function(x) {
+        rownames(x)[x[,1] == max(x)]
+    })
+
+    names(top) <- names(test_metadata)
+
+    return(list(nonzero = nonzero, top = top))
     
     
+}
+
+
+#' geneLoadingsEvaluation
+#' 
+#'  geneLoadingsEvaluation is a function for identifying the top loading genes on each latent variable and aligning them with input data
+#'
+#' @param H_train Matrix of trained H matrix
+#' @param module_size Size of consecutive modules for DREAM simulations.
+#' @export
+
+geneLoadingsEvaluation <- function(H_train, module_size = 10) {
+    n_genes <- ncol(H_train)
+    lower_bound <- seq(1,n_genes,module_size)
+    upper_bound <- lower_bound + module_size -1
+
+    module_scores <- lapply(1:length(lower_bound), function(i) {
+        rowSums(H_train[,lower_bound[i]:upper_bound[i]])
+    })
+    
+    return(module_scores)
+
 }
