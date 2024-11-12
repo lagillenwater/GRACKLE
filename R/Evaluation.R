@@ -10,7 +10,11 @@
 #' @return nonzero Named list of nonzero coefficients by subgroup prediction
 #' @export
 categoricalPrediction <- function(W_test,test_metadata){
-    
+  
+    ## name LV's
+    n_lvs <- ncol(W_test)
+    colnames(W_test) <- paste0("LV", 1:n_lvs)
+  
     test_metadata <- as.data.frame(test_metadata)
         
     ## Fit penalized logistic regression models for each outcome
@@ -25,6 +29,7 @@ categoricalPrediction <- function(W_test,test_metadata){
         coef(model, s = model$lambda.min)
         
     })
+    
 
     ## nonzero coefficients
     nonzero <- lapply(coefficients, function(x) {
@@ -56,6 +61,10 @@ categoricalPrediction <- function(W_test,test_metadata){
 #' @export
 
 geneLoadingsEvaluation <- function(H_train, module_size = 10) {
+    # name LV's
+
+    n_lvs <- nrow(H_train)
+    rownames(H_train) <- paste0("LV", 1:n_lvs)
     n_genes <- ncol(H_train)
     lower_bound <- seq(1,n_genes,module_size)
     upper_bound <- lower_bound + module_size -1
@@ -64,6 +73,12 @@ geneLoadingsEvaluation <- function(H_train, module_size = 10) {
     ## calculate the module scores
     module_scores <- lapply(1:n_modules, function(i) {
         rowSums(H_train[,lower_bound[i]:upper_bound[i]])
+    })
+    
+   
+    module_scores <- lapply(module_scores, function(x) {
+      names(x) <- paste0("LV", 1:n_lvs)
+      return(x)
     })
 
     ## top modules
@@ -74,4 +89,42 @@ geneLoadingsEvaluation <- function(H_train, module_size = 10) {
     
     return(list(module_scores = module_scores, top = top))
 
+}
+
+
+
+#' sampleLoadingsEvaluation
+#' 
+#'  sampleLoadingsEvaluation is a function for identifying the top loading genes on each latent variable and aligning them with input data
+#'
+#' @param W_test Matrix of projected W from test data
+#' @param module_size Size of consecutive modules for DREAM simulations.
+#' @return top A list of the module score. 
+#' @export
+
+sampleLoadingsEvaluation <- function(W_test, test_metadata) {
+  # name LV's
+  ## name LV's
+  n_lvs <- ncol(W_test)
+  colnames(W_test) <- paste0("LV", 1:n_lvs)
+  
+  test_metadata <- as.data.frame(test_metadata)
+  
+  subgroups <- names(test_metadata)
+  
+    ## calculate the module scores
+  subgroup_scores <- lapply(subgroups, function(i) {
+    subgroup_samples <- rownames(test_metadata)[test_metadata[i] == 1]
+    colSums(W_test[subgroup_samples,])
+  })
+  
+  ## top coefficient
+  top <- lapply(subgroup_scores, function(x) {
+    names(x)[x == max(x)]
+  })
+  
+  names(top) <- names(test_metadata)
+  
+  return(list(subgroup_scores = subgroup_scores, top = top))
+  
 }

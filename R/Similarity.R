@@ -13,8 +13,9 @@ similarity_calc <- function(input_matrix) {
           }
     
     distance <- as.matrix(dist(input_matrix, method = "euclidean"))
-    #similarity <- 1 / (1 + as.matrix(distance))
+ ##   similarity <- 1 / (1 + as.matrix(distance))
     similarity <- exp(-distance)
+#    similarity[similarity < threshold] <- 0
     colnames(similarity) <- rownames(input_matrix)
     rownames(similarity) <- rownames(input_matrix)
     return(similarity)

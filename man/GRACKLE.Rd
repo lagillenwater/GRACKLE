@@ -12,7 +12,8 @@ GRACKLE(
   lambda_1 = 0.5,
   lambda_2 = 0.5,
   k = 5,
-  verbose = FALSE
+  verbose = FALSE,
+  beta = 0.1
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ GRACKLE(
 \item{k}{An integer specifying the number of clusters or components. Default is 5.}
 
 \item{verbose}{A boolean value as to whether to print loss error or not. Default is FALSE.}
+
+\item{beta}{A numeric value representing the degree of l2 regularization. Default is 0.1.}
 }
 \value{
 A list containing the following components:

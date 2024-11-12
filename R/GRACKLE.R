@@ -13,6 +13,7 @@
 #' @param lambda_2 A numeric value representing the second regularization parameter. Default is 0.5.
 #' @param k An integer specifying the number of clusters or components. Default is 5.
 #' @param verbose A boolean value as to whether to print loss error or not. Default is FALSE. 
+#' @param beta A numeric value representing the degree of l2 regularization. Default is 0.1. 
 #' @return A list containing the following components:
 #' \item{residual}{A matrix representing the residuals, calculated as \code{Y - W \%*\% H}.}
 #' \item{H}{The matrix \code{H} obtained from the NMF calculation.}
@@ -31,7 +32,8 @@ GRACKLE <- function(
     lambda_1 = .5,
     lambda_2 = .5,
     k = 5, 
-    verbose = FALSE) {
+    verbose = FALSE,
+    beta = .1) {
   
 
     ## calc degree
@@ -84,19 +86,22 @@ GRACKLE <- function(
         
         ## Iteratively update matrices
 
-        W <- W *  ((Y %*% t(H))  / (W%*% H %*% t(H) + lambda_1 * D_p %*% W) )
+        W <- W *  ((Y %*% t(H) + lambda_1 * patient_similarity %*% W  )   / (W%*% H %*% t(H) + lambda_1 * D_p %*% W + beta * W) )
+        #W <- normalize(W)
         ##W <- W  * (1 + learning_rate * ((Y %*% t(H) + lambda_1*patient_similarity %*%W)/(W %*% H %*% t(H) + lambda_1 * D_p %*% W + beta_1*W) -1))
         ##W[W<threshold] <- 0
         ## W[W<0] <- .Machine$double.eps
         ##        W <- W/max(W)
+        ##W <- apply(W,2,min_max_scale)
         
-        H <-H *  ((t(W) %*% Y ) / (t(W) %*% W %*% H + H%*% D_g * lambda_2) )
         
+        H <-H *  ((t(W) %*% Y + H %*% net_similarity * lambda_2) / (t(W) %*% W %*% H + H%*% D_g * lambda_2 + beta*H) )
+        #H <- normalize(H)
         ##H <- H  * ( 1+  learning_rate *  ((t(W) %*% Y + lambda_2*H%*%net_similarity ) / (t(W) %*% W %*% H + lambda_2 * H %*% D_g + beta_2*H ) -1 ))
         ##H[H<threshold] <-0
         ## H[H<0] <- .Machine$double.eps
         ##       H <- H/max(H)
-
+        ##H <- t(apply(H,1,min_max_scale))
         ##W <- pmax(W - beta_1,0)
        ## H <- pmax(H - beta_2,0)
         
@@ -112,25 +117,18 @@ GRACKLE <- function(
         pat_sim_error_vec <- c(pat_sim_error_vec, pat_sim_error)
         grn_error_vec <- c(grn_error_vec, grn_error)
         
-                                        # norm_recon_error <- reconstruction_error_vec/max(reconstruction_error_vec)
-                                        # norm_pat_sim_error <- pat_sim_error_vec/max(pat_sim_error_vec)
-                                        # norm_grn_error <- grn_error_vec/max(grn_error_vec)
-        
-        
-                                        #   if(tail(norm_pat_sim_error,n = 1) < tail(norm_grn_error, n = 1)) {
-                                        #     lambda_1 <- lambda_1 * (1-learning_rate)
-                                        #   } else {
-                                        #     
-                                        #     lambda_2 <- lambda_2 * (1-learning_rate)
-                                        # }
-                                        #   print(paste("lambda_1", lambda_1))
-                                        #   print(paste("lambda_2", lambda_2))
+                                      
         
         W_diff <- round(sum((W - oldW)^2)/sum(W^2),7)
+      #  print(W_diff)
         W_diff_vec <-c(W_diff_vec, W_diff)
 
         H_diff <- round(sum((H - oldH)^2)/sum(H^2),7)
+       # print(H_diff)
         H_diff_vec <-c(H_diff_vec, H_diff)
+        
+        
+        if(reconstruction_error > (1.25 * reconstruction_error_vec[length(reconstruction_error_vec) - 1])) {break}
         
     }
     

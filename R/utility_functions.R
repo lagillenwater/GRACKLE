@@ -12,3 +12,14 @@ min_max_scale <- function(x) {
     scaled <- (x - min(x, na.rm = T)) / (max(x, na.rm = T) - min(x, na.rm = T))
   return(scaled)
 }
+
+#' normalize
+#' 
+#'  normalize is a function for scaling matrices
+#'
+#' @param matrix input matrix to normalize
+#' @return normalized matrix
+#' @export
+normalize <- function(matrix) {
+  return(matrix / sqrt(rowSums(matrix^2)))
+}

@@ -11,6 +11,9 @@ geneLoadingsEvaluation(H_train, module_size = 10)
 
 \item{module_size}{Size of consecutive modules for DREAM simulations.}
 }
+\value{
+top A list of the module score.
+}
 \description{
 geneLoadingsEvaluation is a function for identifying the top loading genes on each latent variable and aligning them with input data
 }
