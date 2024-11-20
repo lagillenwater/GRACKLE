@@ -4,14 +4,18 @@
 \alias{min_max_scale}
 \title{min_max_scale}
 \usage{
-min_max_scale(x)
+min_max_scale(data, min_vals, max_vals)
 }
 \arguments{
-\item{x}{numerical vector}
+\item{data}{A data frame of numeric values}
+
+\item{min_vals}{A numeric vector of minimum values for each column}
+
+\item{max_vals}{A numeric vector of maximum values for each column}
 }
 \value{
-scaled min max scaled numerical vector
+scaled min max data frame
 }
 \description{
-min_max_scale is a function for scaling a vetor of values between 0 and 1
+min_max_scale is a function for scaling a vector of values between 0 and 1
 }

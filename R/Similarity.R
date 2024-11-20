@@ -1,13 +1,12 @@
 # Similarity Functions
-#' similarity_calc
+#' similarityCalc
 #' 
-#'  This function calculates the similarity matrix from an input matrix
+#' @description   This function calculates the similarity matrix from an input matrix
 #'
 #' @useDynLib GRACKLE
-#' @import Rcpp
 #' @param input_matrix Input matrix of adjacency matrix or 
 #' @export
-similarity_calc <- function(input_matrix) {
+similarityCalc <- function(input_matrix) {
     if (!is.matrix(input_matrix)) {
         stop("Error: Input is not a matrix.")
           }

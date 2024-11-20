@@ -4,7 +4,6 @@
 #' 
 #'  Function for running Graph Regularization Across Contextual KnowLedgE
 #'
-#' @useDynLib GRACKLE
 #' @param Y Input gene expression data
 #' @param net_similarity Similarity matrix based on GRN
 #' @param patient_similarity Similarity matrix based on patient metadata
@@ -13,7 +12,7 @@
 #' @param lambda_2 A numeric value representing the second regularization parameter. Default is 0.5.
 #' @param k An integer specifying the number of clusters or components. Default is 5.
 #' @param verbose A boolean value as to whether to print loss error or not. Default is FALSE. 
-#' @param beta A numeric value representing the degree of l2 regularization. Default is 0.1. 
+#' @param beta A numeric value representing the degree of l2 regularization. Default is 0. 
 #' @return A list containing the following components:
 #' \item{residual}{A matrix representing the residuals, calculated as \code{Y - W \%*\% H}.}
 #' \item{H}{The matrix \code{H} obtained from the NMF calculation.}
@@ -33,7 +32,7 @@ GRACKLE <- function(
     lambda_2 = .5,
     k = 5, 
     verbose = FALSE,
-    beta = .1) {
+    beta = 0) {
   
 
     ## calc degree

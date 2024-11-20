@@ -4,7 +4,7 @@
 #' 
 #'  This function reads in the simulated expression profiles from the DREAM4 challenge. Depending on the perturbation parameter, it will read in a single data type or all available. 
 #'
-#' @import dplyr
+#' @importFrom dplyr bind_rows
 #' @param training_directory Path to the input directory of training data
 #' @param perturbation The in silico perturbation condition. Default is NULL, in which case all perturbation conditions are combined. Other options include "wildtype", "knockdown", "knockouts", and "multifactorial"
 #' @return A list containing the following components:
@@ -123,8 +123,9 @@ preserveCorrelation <- function(original, noisy) {
 #' 
 #'  This function reads in the gene regulatory networks used to create the simulated expression data. . 
 #'
-#' @import igraph
-#' @import dplyr
+#' @importFrom igraph graph_from_data_frame
+#' @importFrom igraph as_adjacency_matrix
+#' @importFrom dplyr bind_rows
 #' @param gold_standards_directory Directory where the gold standard networks exist. Gold standard networks are edgelists with the format (G1	G2	1)
 #' @return network Aggregated network
 #' @export

@@ -1,8 +1,0 @@
-## Evaluation functions
-
-#' categoricalPredication
-#' 
-#'  Function for predicting categorical labels in test data
-#'
-#' @useDynLib GRACKLE
-#' @param 

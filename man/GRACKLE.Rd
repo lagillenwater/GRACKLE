@@ -8,12 +8,12 @@ GRACKLE(
   Y,
   net_similarity,
   patient_similarity,
-  diff_threshold = 1e-04,
+  diff_threshold = 0.0001,
   lambda_1 = 0.5,
   lambda_2 = 0.5,
   k = 5,
   verbose = FALSE,
-  beta = 0.1
+  beta = 0
 )
 }
 \arguments{
@@ -33,7 +33,7 @@ GRACKLE(
 
 \item{verbose}{A boolean value as to whether to print loss error or not. Default is FALSE.}
 
-\item{beta}{A numeric value representing the degree of l2 regularization. Default is 0.1.}
+\item{beta}{A numeric value representing the degree of l2 regularization. Default is 0.}
 }
 \value{
 A list containing the following components:
