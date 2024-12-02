@@ -1,36 +1,41 @@
 ## Simulation functions
 
-#' permuteNetwork
+#' randomNetwork
 #' 
-#'  permuteNetwork is a function for permuting the network while maintaining the the degree distribution
-#'
-#' @importFrom igraph rewire
-#' @param g igraph graph object
+#' @description randomNetwork applies igraph functions for creating a random network
+#' @importFrom igraph barabasi.game
+#' @param n Numeric value indicating the size of the graph. (Default is 100)
 #' @param edge_quantiles Numeric vector of length 5 with reported quantile values for graph edges
-#' @return permuted graph with the original degree distribution.
+#' @return random graph with the defined number of edges
 #' @export
-permuteNetwork <- function(g, edge_quantiles){
-  g <- rewire(g, with = keeping_degseq(niter = 100))
-  #g <- rewire(g, each_edge(p = 0.1, loops = FALSE))
+#' 
+randomNetwork <- function(n = 100,edge_quantiles) {
+  g <- barabasi.game(n = n, m = 2, directed = TRUE)
+  V(g)$name = as.character(1:n)
+  
   sm <- randomQuantileVector(ecount(g), edge_quantiles) 
   E(g)$op <- sm
   
   return(g)
 }
 
-#' randomNetwork
+
+#' permuteNetwork
 #' 
-#' @description randomNetwork applies igraph functions for creating a random network
-#' @importFrom igraph barabasi.game
-#' @param n Numeric value indicating the size of the graph. (Default is 100)
-#' @return random graph with the defined number of edges
+#'  permuteNetwork is a function for permuting the network while maintaining the the degree distribution
+#'n
+#' @importFrom igraph rewire
+#' @param g igraph graph object
+#' @return permuted graph with the original degree distribution.
 #' @export
-#' 
-randomNetwork <- function(n = 100, plot = FALSE) {
-  g <- barabasi.game(n = n, m = 3, directed = TRUE)
-  V(g)$name = as.character(1:n)
+permuteNetwork <- function(g){
+  g <- rewire(g, with = keeping_degseq(niter = 100))
+  #g <- rewire(g, each_edge(p = 0.1, loops = FALSE))
+  
   return(g)
 }
+
+
 
 #' randomQantileVector
 #' 
@@ -77,7 +82,7 @@ simulateExpression <- function(g, edge_quantiles, iterations = 10, max_expressio
       
     #Declaring input data object
     rsg <- new("rsgns.data",network=g, rconst=rc)
-  res <- lapply(1:iterations, function(x) {
+    res <- lapply(1:iterations, function(x) {
     #Call the R function for SGN simulator
     capture.output(xx <- rsgns.rn(rsg, rp, timeseries=FALSE, sample=num_samples))
     
@@ -92,6 +97,14 @@ simulateExpression <- function(g, edge_quantiles, iterations = 10, max_expressio
     
 }
 
+#' makeDirected
+#' 
+#' @description makeDirected is a function that turns an undirected, weighted network into a directed network with values of 1 or -1 for inferring regulatory context between genes that are thought to interact. 
+#' @param expression Data Frame of gene expression data
+#' @param network Data Frame of network adjacency matrix
+#' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
+#' @param num_samples Numeric values for the number of samples to simulate. (Default is 5)
+#' @export
 
 #' networkSimilarity
 #' 
