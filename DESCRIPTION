@@ -13,7 +13,8 @@ Imports:
 	igraph,
 	Rcpp,
 	nnls,
-	glmnet
+	glmnet,
+	parallel
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)

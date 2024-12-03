@@ -4,10 +4,12 @@
 \alias{randomNetwork}
 \title{randomNetwork}
 \usage{
-randomNetwork(n = 100, plot = FALSE)
+randomNetwork(n = 100, edge_quantiles)
 }
 \arguments{
 \item{n}{Numeric value indicating the size of the graph. (Default is 100)}
+
+\item{edge_quantiles}{Numeric vector of length 5 with reported quantile values for graph edges}
 }
 \value{
 random graph with the defined number of edges

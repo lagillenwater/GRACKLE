@@ -4,7 +4,6 @@
 #' 
 #'  Function for predicting categorical labels in test data
 #'
-#' @useDynLib GRACKLE
 #' @import nnls
 #' @param test_expression Data.frame of test expression data
 #' @param H_train Matrix of trained H matrix

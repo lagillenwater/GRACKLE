@@ -99,19 +99,22 @@ simulateExpression <- function(g, edge_quantiles, iterations = 10, max_expressio
 
 #' makeDirected
 #' 
-#' @description makeDirected is a function that turns an undirected, weighted network into a directed network with values of 1 or -1 for inferring regulatory context between genes that are thought to interact. 
+#' @description makedDirected is a function for  calculating the pairwise correlations coefficients between genes and assigning direction to the network based on correlation. 
+#' @importFrom parallel detectCores  mclapply
 #' @param expression Data Frame of gene expression data
-#' @param network Data Frame of network adjacency matrix
-#' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
-#' @param num_samples Numeric values for the number of samples to simulate. (Default is 5)
+#' @param network Data Frame of the network edgelist with column names 'from', 'to', 'weight'.
+#' @return Dataframe of network edgelist with direction (1 = activation, -1 = suppression)
 #' @export
+makeDirected <- function(expression,network) {
+  num_cores <- detectCores() - 1
+  correlations <- mclapply( 1:nrow(network), function(i) {
+    x <- expression[,network$from[i]]
+    y <- expression[,network$to[i]]
+    cor(x,y)
+  },mc.cores = num_cores)
+  network$correlation <- c(unlist(correlations))
+  network$direction <- ifelse(network$correlation > 0, 1,-1 )
+  
+  return(network)
+}
 
-#' networkSimilarity
-#' 
-#' @description networkSimilarity is a function that calculates the similarity between permuted 
-#' @param g igraph graph object
-#' @param edge_quantiles Numeric vector of length 5 with reported quantile values for graph edges
-#' @param iterations numeric indicating how many iterations to perform. (Default = 10)
-#' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
-#' @param num_samples Numeric values for the number of samples to simulate. (Default is 5)
-#' @export

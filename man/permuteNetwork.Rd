@@ -4,14 +4,12 @@
 \alias{permuteNetwork}
 \title{permuteNetwork}
 \usage{
-permuteNetwork(g, edge_quantiles)
+permuteNetwork(g)
 
-permuteNetwork(g, edge_quantiles)
+permuteNetwork(g)
 }
 \arguments{
 \item{g}{igraph graph object}
-
-\item{edge_quantiles}{Numeric vector of length 5 with reported quantile values for graph edges}
 
 \item{network}{Matrix for the adjacency to permute}
 }
@@ -24,4 +22,5 @@ permuted graph with the original degree distribution.
 permuteNetwork is a function for permuting the network to test as a negative control
 
 permuteNetwork is a function for permuting the network while maintaining the the degree distribution
+n
 }
