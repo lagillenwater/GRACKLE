@@ -4,13 +4,7 @@
 \alias{simulateExpression}
 \title{simualateExpression}
 \usage{
-simulateExpression(
-  g,
-  edge_quantiles,
-  iterations = 10,
-  max_expression = 2000,
-  num_samples = 5
-)
+simulateExpression(g, iterations = 10, max_expression = 2000, num_samples = 5)
 }
 \arguments{
 \item{g}{igraph graph object}

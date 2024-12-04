@@ -34,7 +34,7 @@ normalize <- function(matrix) {
 #'  entrezToHGNC is a function for converting entrez ID's to HGNC ID's
 #'
 #' @importFrom utils download.file
-#' @importFrom dplyr filter arrange select
+#' @importFrom dplyr filter arrange select %>%
 #' @param ensembl_ids  Character vector of entrez ID's to convert to HGNC gene ID's
 #' @return hgnc_ids   Character vector of HGNC ID's
 #' @export

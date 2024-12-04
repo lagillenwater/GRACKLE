@@ -20,19 +20,29 @@ randomNetwork <- function(n = 100,edge_quantiles) {
 }
 
 
-#' permuteNetwork
+#' modulePermutations
 #' 
-#'  permuteNetwork is a function for permuting the network while maintaining the the degree distribution
-#'n
-#' @importFrom igraph rewire
+#'  modulePermutations is a function for creating permuted graphs based on permuting specific modules within the graph
+#'
 #' @param g igraph graph object
+#' @param membership module membership based on graph clustering.
+#' @param module_ids Numeric vector for the membership ids to permute.
 #' @return permuted graph with the original degree distribution.
 #' @export
-permuteNetwork <- function(g){
-  g <- rewire(g, with = keeping_degseq(niter = 100))
-  #g <- rewire(g, each_edge(p = 0.1, loops = FALSE))
+modulePermutations <- function(g,membership, module_ids){
   
-  return(g)
+  module_vertices <- which(membership %in% module_ids)
+
+  set.seed(42)
+  permutation <- sample(module_vertices)
+  
+  full_permutation <- seq_len(vcount(g))
+  full_permutation[module_vertices] <- permutation
+  
+  g_permuted <- permute(g,full_permutation)
+
+  
+  return(g_permuted)
 }
 
 
@@ -57,16 +67,18 @@ randomQuantileVector <- function(n,  values) {
 #' simualateExpression
 #' 
 #' @description simulateExpression is a function for simulating gene expression data from a GRN. It applies the functions outlined in the sgresR package vignette.
+#' @import sgnesR 
 #' @param g igraph graph object
 #' @param iterations numeric indicating how many iterations to perform. (Default = 10)
 #' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
 #' @param num_samples Numeric values for the number of samples to simulate. (Default is 5)
 #' @export
-simulateExpression <- function(g, edge_quantiles, iterations = 10, max_expression = 2000, num_samples = 5) {
+simulateExpression <- function(g,  iterations = 10, max_expression = 2000, num_samples = 5) {
  
-      
+  res <- lapply(1:iterations, function(x) {
+    
     # Specifying global reaction parameters.
-    rp<-new("rsgns.param",time=0,stop_time=1000,readout_interval=1000)
+    rp<-new("rsgns.param",time=0,stop_time=1000,readout_interval= 1000)
   
     # Specifying the reaction rate constant vector for following reactions: (1) Translation rate, (2) RNA degradation rate, (3) Protein degradation rate, (4) Protein binding rate, (5) unbinding rate, (6) transcription rate.
     rc <- c(0.002, 0.005, 0.005, 0.005, 0.01, 0.02)
@@ -82,7 +94,7 @@ simulateExpression <- function(g, edge_quantiles, iterations = 10, max_expressio
       
     #Declaring input data object
     rsg <- new("rsgns.data",network=g, rconst=rc)
-    res <- lapply(1:iterations, function(x) {
+   
     #Call the R function for SGN simulator
     capture.output(xx <- rsgns.rn(rsg, rp, timeseries=FALSE, sample=num_samples))
     

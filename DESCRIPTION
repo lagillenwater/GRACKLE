@@ -14,7 +14,8 @@ Imports:
 	Rcpp,
 	nnls,
 	glmnet,
-	parallel
+	parallel,
+	sgnesR
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)

@@ -8,7 +8,7 @@ GRACKLE(
   Y,
   net_similarity,
   patient_similarity,
-  diff_threshold = 0.0001,
+  diff_threshold = 1e-04,
   lambda_1 = 0.5,
   lambda_2 = 0.5,
   k = 5,
