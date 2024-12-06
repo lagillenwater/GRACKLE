@@ -4,12 +4,14 @@
 \alias{geneLoadingsEvaluation}
 \title{geneLoadingsEvaluation}
 \usage{
-geneLoadingsEvaluation(H_train, module_size = 10)
+geneLoadingsEvaluation(H_train, clusters, aligned_clusters)
 }
 \arguments{
 \item{H_train}{Matrix of trained H matrix}
 
-\item{module_size}{Size of consecutive modules for DREAM simulations.}
+\item{clusters}{Igraph object that is a list of cluster (aka, module) assignments}
+
+\item{aligned_clusters}{The cluster labels aligned to the metadata group assignments}
 }
 \value{
 top A list of the module score.

@@ -12,7 +12,7 @@ net <- aggregateNetworks("./DREAM4/Size 10/DREAM4 gold standards/")
 res <- sapply(seq(.1,1,.1), function(x){
   print(x)
   ## aggregate the gene expression data
-  train <- aggregateExpression("./DREAM4/Size 10/DREAM4 training data/")
+  train <- aggregateExpression("../DREAM4/Size 10/DREAM4 training data/")
   
   ## impute the missing data with random values in the same distribution as observed values
   train$expression <- noisyImputation(train$expression, .5)

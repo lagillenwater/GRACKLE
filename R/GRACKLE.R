@@ -69,41 +69,26 @@ GRACKLE <- function(
     reconstruction_error_vec <- c(reconstruction_error_vec, reconstruction_error)
     pat_sim_error_vec <- c(pat_sim_error_vec, pat_sim_error)
     grn_error_vec <- c(grn_error_vec, grn_error)
-    
-                                        # norm_recon_error <- reconstruction_error_vec/max(reconstruction_error_vec)
-                                        # norm_pat_sim_error <- pat_sim_error_vec/max(pat_sim_error_vec)
-                                        # norm_grn_error <- grn_error_vec/max(grn_error_vec)
-    
+        
     H_diff <- 1
     W_diff <- 1
     
-    
-    
+        
     while((H_diff > diff_threshold) | (W_diff >diff_threshold)) {
         oldW <- W
         oldH <- H
         
         ## Iteratively update matrices
+        
+      
 
-        W <- W *  ((Y %*% t(H) + lambda_1 * patient_similarity %*% W  )   / (W%*% H %*% t(H) + lambda_1 * D_p %*% W + beta * W) )
-        #W <- normalize(W)
-        ##W <- W  * (1 + learning_rate * ((Y %*% t(H) + lambda_1*patient_similarity %*%W)/(W %*% H %*% t(H) + lambda_1 * D_p %*% W + beta_1*W) -1))
-        ##W[W<threshold] <- 0
-        ## W[W<0] <- .Machine$double.eps
-        ##        W <- W/max(W)
-        ##W <- apply(W,2,min_max_scale)
+        W <- W *  ((Y %*% t(H) + lambda_1 * patient_similarity %*% W  )   / (W%*% H %*% t(H) + lambda_1 * D_p %*% W ) )
+        W <- apply(W,2,function(x) scale(x,center = F))
         
-        
-        H <-H *  ((t(W) %*% Y + H %*% net_similarity * lambda_2) / (t(W) %*% W %*% H + H%*% D_g * lambda_2 + beta*H) )
-        #H <- normalize(H)
-        ##H <- H  * ( 1+  learning_rate *  ((t(W) %*% Y + lambda_2*H%*%net_similarity ) / (t(W) %*% W %*% H + lambda_2 * H %*% D_g + beta_2*H ) -1 ))
-        ##H[H<threshold] <-0
-        ## H[H<0] <- .Machine$double.eps
-        ##       H <- H/max(H)
-        ##H <- t(apply(H,1,min_max_scale))
-        ##W <- pmax(W - beta_1,0)
-       ## H <- pmax(H - beta_2,0)
-        
+        H <-H *  ((t(W) %*% Y + H %*% net_similarity * lambda_2) / (t(W) %*% W %*% H + H%*% D_g * lambda_2 ) )
+        H <- t(apply(H,1,function(x) scale(x,center = F)))
+       
+       
         reconstruction_error <- sum((Y-W%*%H)^2)
         pat_sim_error <- lambda_1 * sum(diag(t(W) %*% L_p %*%W))
         grn_error <-lambda_2 * sum(diag(H  %*% L_g %*% t(H)))
@@ -127,7 +112,7 @@ GRACKLE <- function(
         H_diff_vec <-c(H_diff_vec, H_diff)
         
         
-        if(reconstruction_error > (1.25 * reconstruction_error_vec[length(reconstruction_error_vec) - 1])) {break}
+ #       if(reconstruction_error > (1.25 * reconstruction_error_vec[length(reconstruction_error_vec) - 1])) {break}
         
     }
     

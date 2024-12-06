@@ -11,8 +11,8 @@
 #' @return scaled min max data frame
 #' @export
 min_max_scale <- function(data, min_vals, max_vals) {
-scaled_data <- sweep(data, 2, min_vals, "-")
-scaled_data <- sweep(scaled_data, 2, max_vals - min_vals, "/")
+  scaled_data <- sweep(data, 2, min_vals, "-")
+  scaled_data <- sweep(scaled_data, 2, max_vals - min_vals, "/")
 return(scaled_data)
 }
 

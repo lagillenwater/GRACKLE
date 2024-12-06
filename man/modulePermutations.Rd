@@ -4,7 +4,7 @@
 \alias{modulePermutations}
 \title{modulePermutations}
 \usage{
-modulePermutations(g, membership, module_ids)
+modulePermutations(g, membership, module_ids, increase_percentage = 1.15)
 }
 \arguments{
 \item{g}{igraph graph object}
@@ -12,6 +12,8 @@ modulePermutations(g, membership, module_ids)
 \item{membership}{module membership based on graph clustering.}
 
 \item{module_ids}{Numeric vector for the membership ids to permute.}
+
+\item{increase_percentage}{Numeric value to scale the edge weights by. Default is 1.15}
 }
 \value{
 permuted graph with the original degree distribution.

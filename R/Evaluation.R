@@ -56,23 +56,20 @@ categoricalPrediction <- function(W_test,test_metadata){
 #'  geneLoadingsEvaluation is a function for identifying the top loading genes on each latent variable and aligning them with input data
 #'
 #' @param H_train Matrix of trained H matrix
-#' @param module_size Size of consecutive modules for DREAM simulations.
+#' @param clusters Igraph object that is a list of cluster (aka, module) assignments
+#' @param aligned_clusters The cluster labels aligned to the metadata group assignments
 #' @return top A list of the module score. 
 #' @export
 
-geneLoadingsEvaluation <- function(H_train, module_size = 10) {
+geneLoadingsEvaluation <- function(H_train, clusters, aligned_clusters ) {
     # name LV's
 
     n_lvs <- nrow(H_train)
     rownames(H_train) <- paste0("LV", 1:n_lvs)
-    n_genes <- ncol(H_train)
-    lower_bound <- seq(1,n_genes,module_size)
-    upper_bound <- lower_bound + module_size -1
-    n_modules <- length(lower_bound)
-
+  
     ## calculate the module scores
-    module_scores <- lapply(1:n_modules, function(i) {
-        rowSums(H_train[,lower_bound[i]:upper_bound[i]])
+    module_scores <- lapply(aligned_clusters, function(i) {
+        rowSums(H_train[,clusters[[i]]])
     })
     
    
@@ -85,7 +82,7 @@ geneLoadingsEvaluation <- function(H_train, module_size = 10) {
     top <- lapply(module_scores, function(x) {
         names(x)[x == max(x)]
     })
-    names(top) <- paste0("subgroup",1:n_modules)
+    names(top) <- paste0("subgroup",1:length(top))
     
     return(list(module_scores = module_scores, top = top))
 
@@ -113,14 +110,28 @@ sampleLoadingsEvaluation <- function(W_test, test_metadata) {
   subgroups <- names(test_metadata)
   
     ## calculate the module scores
+  ## TODO : deal with cases of zero values in subgroup
   subgroup_scores <- lapply(subgroups, function(i) {
-    subgroup_samples <- rownames(test_metadata)[test_metadata[i] == 1]
-    colSums(W_test[subgroup_samples,])
+    subgroup_samples <- rownames(test_metadata)[test_metadata[,i] == 1]
+    num_samples = length(subgroup_samples)
+    if(num_samples == 0) {
+      res <- as.data.frame(t(W_test[1,]))
+      res[1,] <-0
+      return(res)
+    } else if(num_samples ==1) {
+      W_test[subgroup_samples,]
+    } else {
+      colSums(W_test[subgroup_samples,])
+    }
   })
   
   ## top coefficient
   top <- lapply(subgroup_scores, function(x) {
     names(x)[x == max(x)]
+  })
+  
+  top <- lapply(top, function(x) {
+    if(length(x) > 1) { NA} else {x}
   })
   
   names(top) <- names(test_metadata)

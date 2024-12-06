@@ -27,22 +27,25 @@ randomNetwork <- function(n = 100,edge_quantiles) {
 #' @param g igraph graph object
 #' @param membership module membership based on graph clustering.
 #' @param module_ids Numeric vector for the membership ids to permute.
+#' @param increase_percentage Numeric value to scale the edge weights by. Default is 1.15
 #' @return permuted graph with the original degree distribution.
 #' @export
-modulePermutations <- function(g,membership, module_ids){
+modulePermutations <- function(g,membership, module_ids, increase_percentage = 1.15){
   
   module_vertices <- which(membership %in% module_ids)
 
-  set.seed(42)
-  permutation <- sample(module_vertices)
+  # Get the edges connected to these vertices
+  edges_of_interest <- E(g)[.from(module_vertices) | .to(module_vertices)]
   
-  full_permutation <- seq_len(vcount(g))
-  full_permutation[module_vertices] <- permutation
+  # Extract the weights of these edges
+  edge_weights <- E(g)$weight[edges_of_interest]
   
-  g_permuted <- permute(g,full_permutation)
-
+  # increase the edge weights by a defined factor
+  scaled_weights <- edge_weights * increase_percentage
   
-  return(g_permuted)
+   E(g)$weight[edges_of_interest] <- scaled_weights
+  
+  return(g)
 }
 
 
@@ -78,14 +81,14 @@ simulateExpression <- function(g,  iterations = 10, max_expression = 2000, num_s
   res <- lapply(1:iterations, function(x) {
     
     # Specifying global reaction parameters.
-    rp<-new("rsgns.param",time=0,stop_time=1000,readout_interval= 1000)
+    rp<-new("rsgns.param",time=0,stop_time=100,readout_interval= 100)
   
     # Specifying the reaction rate constant vector for following reactions: (1) Translation rate, (2) RNA degradation rate, (3) Protein degradation rate, (4) Protein binding rate, (5) unbinding rate, (6) transcription rate.
-    rc <- c(0.002, 0.005, 0.005, 0.005, 0.01, 0.02)
     
+    rc <- c(0.002, 0.005, 0.005, 0.005, 0.01, 0.02)
+   
     # count nodes
     n_nodes <- vcount(g)
-    
    
       # Assigning initial values to the RNAs and protein products to each node randomly based on breast gene expression counts.
      
@@ -113,19 +116,51 @@ simulateExpression <- function(g,  iterations = 10, max_expression = 2000, num_s
 #' 
 #' @description makedDirected is a function for  calculating the pairwise correlations coefficients between genes and assigning direction to the network based on correlation. 
 #' @importFrom parallel detectCores  mclapply
+#' @importFrom ppcor pcor
+#' @importFrom dplyr filter %>% select arrange mutate
 #' @param expression Data Frame of gene expression data
 #' @param network Data Frame of the network edgelist with column names 'from', 'to', 'weight'.
 #' @return Dataframe of network edgelist with direction (1 = activation, -1 = suppression)
 #' @export
 makeDirected <- function(expression,network) {
+    
+  ## arrange network by targets
+  network <- network %>%
+    arrange(to)
+  ## identify the target genes
+  targets <- unique(network$to)
+  
+  ## find number of cores for parallelization
   num_cores <- detectCores() - 1
-  correlations <- mclapply( 1:nrow(network), function(i) {
-    x <- expression[,network$from[i]]
-    y <- expression[,network$to[i]]
-    cor(x,y)
+  correlations <- mclapply( targets, function(i) {
+    ## filter network by targets
+    tmp_network <- network %>%
+      filter(to == i)
+    tmp_expression <- expression %>%
+      dplyr::select(c(tmp_network$from,i))
+        
+    ## calculate the partial correlations
+    partial_correlations <- suppressWarnings(pcor(tmp_expression)$estimate)
+    colnames(partial_correlations) <- names(tmp_expression)
+    rownames(partial_correlations) <- names(tmp_expression)
+    
+    ## 
+    res <- partial_correlations %>%
+      as.data.frame  %>%
+      dplyr::select(i)
+
+    if(!(i %in% tmp_network$from)) {
+      res <- res %>%
+        filter(rownames(.) != i)
+    }
+    
+    return(res)
+    
   },mc.cores = num_cores)
+  
   network$correlation <- c(unlist(correlations))
-  network$direction <- ifelse(network$correlation > 0, 1,-1 )
+  network <- network %>%
+    mutate(weight = ifelse(correlation > 0, probability,-probability))
   
   return(network)
 }
