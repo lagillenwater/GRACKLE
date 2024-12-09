@@ -59,14 +59,16 @@ modulePermutations <- function(g,membership, module_ids, increase_constant = 1.1
 #' 
 #' @description simulateExpression is a function for simulating gene expression data from a GRN. It applies the functions outlined in the sgresR package vignette.
 #' @import sgnesR 
+#' @importFrom igraph V degree
 #' @param g igraph graph object
 #' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
 #' @param iterations Numeric value for how many iterations to perform and find average (Default is 3)
 #' @param rc Numeric vector of length 5 representing recaction and decay rates.
 #' @param select_nodes Numeric vector of specific nodes to perturb
 #' @param perturbation_constant Numberic value to increase initial values of perturbed nodes by. (Default is 1.5)
+#' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @export
-simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5) {
+simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = 3) {
   
   res <- lapply(1:iterations, function(x) {
     # Specifying global reaction parameters.
@@ -82,23 +84,34 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
     n_nodes <- vcount(g)
   
     # Assigning initial values to the RNAs and protein products to each node randomly based on breast gene expression counts.
-    V(g)$Ppop <- (sample(max_expression,n_nodes, rep=TRUE))
-    V(g)$Rpop <- (sample(max_expression, n_nodes, rep=TRUE))
+    V(g)$Ppop <- sample(max_expression,n_nodes, rep=TRUE)
+    V(g)$Rpop <- sample(max_expression, n_nodes, rep=TRUE)
     
     if(!is.null(select_nodes)){
-          
-      V(g)$Ppop[select_nodes] <- V(g)$Ppop[select_nodes] * perturbation_constant
-      V(g)$Rpop[select_nodes] <- V(g)$Rpop[select_nodes] * perturbation_constant
       
-      V(g)$Ppop[-select_nodes] <- V(g)$Ppop[-select_nodes] *.5
-      V(g)$Rpop[-select_nodes] <- V(g)$Rpop[-select_nodes] *.5
+      # select_degrees <- degree(g, v = select_nodes)
+      # high_degree_nodes <- select_nodes[select_degrees > 2]
+      # # <- sample(high_degree_nodes,1,replace = F)
+      nodes <- select_nodes
+      
+      
+      V(g)$Ppop[nodes] <- V(g)$Ppop[nodes] * perturbation_constant
+      V(g)$Rpop[nodes] <- V(g)$Rpop[nodes] * perturbation_constant
+      
+      other_nodes <- sample(V(g)[-select_nodes],n_nodes/6) 
+      # # other_degrees <- degree(g, v = other_nodes)
+      # # other_high_degree_nodes <- other_nodes[other_degrees > 2]
+      # # other_nodes <- sample(other_high_degree_nodes,10, replace = F)
+      # # 
+      # V(g)$Ppop[other_nodes] <- V(g)$Ppop[other_nodes]*perturbation_constant
+      # V(g)$Rpop[other_nodes] <- V(g)$Rpop[other_nodes]*perturbation_constant
     }
   
     #Declaring input data object
     rsg <- new("rsgns.data",network=g, rconst=rc)
   
     #Call the R function for SGN simulator
-    capture.output(xx <- rsgns.rn(rsg, rp, timeseries=FALSE, sample=1))
+    xx <- rsgns.rn(rsg, rp, timeseries=FALSE, sample=1)
   
     return(xx$expression)
   })

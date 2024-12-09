@@ -94,7 +94,7 @@ dev.off()
 
  
 ## simulate expression using the base network
-base_exp <- parallelSimulateExpression(g,max_expression = 300,num_samples = 50,iterations = 3)
+base_exp <- parallelSimulateExpression(g,max_expression = 300,num_samples = 100,iterations = 3)
 
 ## compare expression value distribution to actual data
 load("./data/Breast/correlation_filtered_breast_expression.RData")
@@ -102,7 +102,7 @@ quantile(as.matrix(correlations_filtered_breast_expression))
 quantile(as.matrix(base_exp))
 
 ## simulate metadata
-metadata <- simulateMetadata(group_size = rep(10,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
+metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
 
 group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
 ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
@@ -113,7 +113,7 @@ dev.off()
 #permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
 
 # simulate gene expression for the permuted networks
-sim_exp <- lapply(large_clusters, function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 200,num_samples = 3,select_nodes = which(membership == x),perturbation_constant = 3 ))
+sim_exp <- lapply(large_clusters[1:5], function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 4))
 
 ## combine expression data
 sim_exp <- lapply(sim_exp, as.data.frame)
@@ -123,38 +123,20 @@ combined_exp <- do.call(rbind, sim_exp)
 rownames(combined_exp) <- paste0("sample", 1:nrow(combined_exp))
 
 ## simulate metadata
-metadata <- simulateMetadata(group_size = rep(3,3), group_labels = paste0("subgroup", 1:3), row_names = rownames(combined_exp))
+metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(combined_exp))
 
 group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
 ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
- Heatmap(as.matrix(combined_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
 
-pdf("heatmap.pdf")
-draw(p1)
+pdf("./results/simulations/plots/4_permuted_network_heatmap.pdf")
+Heatmap(as.matrix(combined_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
 dev.off()
 
+quantile(as.matrix(combined_exp))
+quantile(as.matrix(correlations_filtered_breast_expression))
 
-## explore the increase percentage as it relates to the data separation
-num_cores <- detectCores() - 1
-  
-mclapply(seq(.5,4,.5), function(i) {
-    
 
   
-   
-  
-    save(combined_exp, file = paste0("./results/simulations/data/expression/", i,"_simulated_expression_100_360.RData"))
-  },mc.cores = num_cores )
-  
-  
-  
-  
-  ## TODO check the quantiles of the simulated expression data against observed expression data
-  
-  # lapply(sim_exp, quantile)
-  
-  load("./results/simulations/data/expression/3_simulated_expression_100_360.RData")
- 
   
   ## split the data into train and test
   dat <- split_data(combined_exp, metadata , training_size = .7)
@@ -206,11 +188,11 @@ for(i in 1:nrow(grid_search)){
       
       ## evaluate sample loadings
       top_sample_LVs <- sampleLoadingsEvaluation(W_test,dat$test_metadata)
-      #print(top_sample_LVs$subgroup_scores)
+      print(top_sample_LVs$top)
         
       ## evaluate gene loadings
       top_loadings <- geneLoadingsEvaluation(g_res$H, clusters = clusters, aligned_clusters = large_clusters)
-     # print(top_loadings$module_scores)
+      print(top_loadings$top)
       
       ## correspondence between selected W LV's and top loading gene modules
       grid_search$score[i] <- mean(unlist(lapply(1:5, function(x) {
@@ -221,9 +203,10 @@ for(i in 1:nrow(grid_search)){
     
   p1 <- ggplot(grid_search, aes(x = lambda_1, y= lambda_2, fill = score)) +
     geom_tile() +
-    scale_fill_continuous(limits = c(0,1))
-  p1
-  ggsave("./results/simulations/scores/heatmap_grid_search_25_360.pdf",plot = p1)
+    scale_fill_continuous(limits = c(0,1)) + 
+  theme_classic()    
+
+  ggsave("./results/simulations/scores/heatmap_grid_search_4.pdf",plot = p1)
     
     
     
@@ -232,7 +215,7 @@ for(i in 1:nrow(grid_search)){
    W_test <-  project_W(min_max_scale(dat$test_expression,min_vals,max_vals), coef(l_res))
      ## evaluate sample loadings
      top_sample_LVs <- sampleLoadingsEvaluation(W_test,dat$test_metadata)
-  #   
+     
      ## evaluate gene loadings
      top_loadings <- geneLoadingsEvaluation(g_res$H, clusters = clusters, aligned_clusters = large_clusters)
   #   

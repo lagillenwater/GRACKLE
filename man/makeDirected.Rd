@@ -12,7 +12,7 @@ makeDirected(expression, network)
 \item{network}{Data Frame of the network edgelist with column names 'from', 'to', 'weight'.}
 }
 \value{
-Dataframe of network edgelist with direction (1 = activation, -1 = suppression)
+Dataframe of network edgelist with directed weights
 }
 \description{
 makedDirected is a function for  calculating the pairwise correlations coefficients between genes and assigning direction to the network based on correlation.
