@@ -4,15 +4,15 @@
 \alias{randomNetwork}
 \title{randomNetwork}
 \usage{
-randomNetwork(n = 100, edge_quantiles)
+randomNetwork(prior_graph, connected = TRUE)
 }
 \arguments{
-\item{n}{Numeric value indicating the size of the graph. (Default is 100)}
+\item{prior_graph}{Igraph object of the directed, weighted prior network to model  the simulated network on.}
 
-\item{edge_quantiles}{Numeric vector of length 5 with reported quantile values for graph edges}
+\item{connected}{Boolean to determine if the random graph should be directed or not. (Default is TRUE)}
 }
 \value{
-random graph with the defined number of edges
+random graph with similar in and out degree
 }
 \description{
 randomNetwork applies igraph functions for creating a random network

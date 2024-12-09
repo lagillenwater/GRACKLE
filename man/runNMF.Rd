@@ -17,7 +17,7 @@ runNMF(expression_matrix, k = 5, method = "lee", seed = 42)
 }
 \value{
 A list containing the following components:
-\item{H}{The matrix \code{H} obtained from the NMF calculation.}
+
 \item{W}{The matrix \code{W} obtained from the NMF calculation.}
 }
 \description{

@@ -4,18 +4,25 @@
 #' 
 #' @description randomNetwork applies igraph functions for creating a random network
 #' @importFrom igraph barabasi.game
-#' @param n Numeric value indicating the size of the graph. (Default is 100)
-#' @param edge_quantiles Numeric vector of length 5 with reported quantile values for graph edges
-#' @return random graph with the defined number of edges
+#' @param prior_graph Igraph object of the directed, weighted prior network to model  the simulated network on. 
+#' @param connected Boolean to determine if the random graph should be directed or not. (Default is TRUE)
+#' @return random graph with similar in and out degree
 #' @export
 #' 
-randomNetwork <- function(n = 100,edge_quantiles) {
-  g <- barabasi.game(n = n, m = 2, directed = TRUE)
-  V(g)$name = as.character(1:n)
+randomNetwork <- function(prior_graph, connected = TRUE){
   
-  sm <- randomQuantileVector(ecount(g), edge_quantiles) 
-  E(g)$op <- sm
+  in_degrees <- degree(prior_graph,mode = "in")
+  out_degrees <- degree(prior_graph,mode = "out")
+  g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
+  sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
+  E(g)$weight <- sm
   
+  if(connected){  
+    components <- decompose(g)
+  
+    g <- components[[which.max(sapply(components, vcount))]]
+  } 
+  print(g)
   return(g)
 }
 
@@ -68,7 +75,7 @@ modulePermutations <- function(g,membership, module_ids, increase_constant = 1.1
 #' @param perturbation_constant Numberic value to increase initial values of perturbed nodes by. (Default is 1.5)
 #' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @export
-simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = 3) {
+simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = NULL) {
   
   res <- lapply(1:iterations, function(x) {
     # Specifying global reaction parameters.
@@ -97,14 +104,15 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
       
       V(g)$Ppop[nodes] <- V(g)$Ppop[nodes] * perturbation_constant
       V(g)$Rpop[nodes] <- V(g)$Rpop[nodes] * perturbation_constant
+    }
       
-      other_nodes <- sample(V(g)[-select_nodes],n_nodes/6) 
-      # # other_degrees <- degree(g, v = other_nodes)
-      # # other_high_degree_nodes <- other_nodes[other_degrees > 2]
-      # # other_nodes <- sample(other_high_degree_nodes,10, replace = F)
-      # # 
-      # V(g)$Ppop[other_nodes] <- V(g)$Ppop[other_nodes]*perturbation_constant
-      # V(g)$Rpop[other_nodes] <- V(g)$Rpop[other_nodes]*perturbation_constant
+    if(!is.null(noise_constant)){
+      noise_nodes <- n_nodes* noise_constant
+      other_nodes <- sample(V(g)[-select_nodes],noise_nodes) 
+  
+      V(g)$Ppop[other_nodes] <- V(g)$Ppop[other_nodes]*perturbation_constant
+      V(g)$Rpop[other_nodes] <- V(g)$Rpop[other_nodes]*perturbation_constant
+  
     }
   
     #Declaring input data object
@@ -134,12 +142,13 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
 #' @param iterations numeric value to pass to simulation function. (Default is 3)
 #' @param select_nodes Numeric vector of specific nodes to perturb
 #' @param perturbation_constant Numberic value to increase initial values of perturbed nodes by. (Default is 1.5)
+#' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @return data frame of simulated gene expression data
 #' @export
-parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5) {
+parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = NULL) {
   num_cores <- detectCores() - 1
   res <- mclapply(1:num_samples, function(x) {
-    simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant )
+    simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
   })
   
   exp <- do.call(cbind,res)

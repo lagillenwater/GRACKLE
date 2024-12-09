@@ -11,8 +11,7 @@ load_all()
 load("./data/Breast/directed_breast_igraph.RData")
 
 ## in and out degree of breast network
-in_degrees <- degree(breast_g,mode = "in")
-out_degrees <- degree(breast_g,mode = "out")
+
 degrees <- degree(breast_g)
 
 pdf("./results/networks/degree_scatter.pdf")
@@ -20,17 +19,7 @@ qplot(y  = seq_along(degrees), x= degrees, geom = "point", ylab = "" ) + theme_c
 dev.off()
   
 # generate random breast_g# generate random nework 
-g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
-sm <- sample(E(breast_g)$weight, ecount(g), rep = FALSE)
-E(g)$weight <- sm
-g
-
-is_connected(g)
-components <- decompose(g)
-  
-g <- components[[which.max(sapply(components, vcount))]]
-is_connected(g)
-g
+g <- randomNetwork(prior_graph = breast_g)
 
 ## plot network
 pdf("./results/networks/network.pdf")
@@ -113,7 +102,7 @@ dev.off()
 #permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
 
 # simulate gene expression for the permuted networks
-sim_exp <- lapply(large_clusters[1:5], function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 4))
+sim_exp <- lapply(large_clusters[1:5], function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 4,noise_constant = .7))
 
 ## combine expression data
 sim_exp <- lapply(sim_exp, as.data.frame)
@@ -139,26 +128,25 @@ quantile(as.matrix(correlations_filtered_breast_expression))
   
   
   ## split the data into train and test
-  dat <- split_data(combined_exp, metadata , training_size = .7)
+  g_adjacency <- as_adjacency_matrix(g)  
   
   set.seed(42)
   
-  
- 
+  dat <- split_data(combined_exp, metadata , training_size = .7)
   
   pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
+    
   
-  g_adjacency <- as_adjacency_matrix(g)
-  
-  net_sim <- similarityCalc(as.matrix(as_adjacency_matrix(g)))
-  # pat_sim[pat_sim < 1] <- 0
   min_vals <- apply(dat$train_expression,2, min)
   max_vals <- apply(dat$train_expression,2, max)
-  ## min-max scale the input matrix
-  Y <-as.matrix( min_max_scale(dat$train_expression,min_vals,max_vals))
+
+    ## min-max scale the input matrix
+  dat$train_expression <-as.matrix( min_max_scale(dat$train_expression,min_vals,max_vals))
+  dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
   
-  i_seq <-seq(0,1,.1) 
-  j_seq <-seq(0,1,.1)
+  
+  i_seq <-seq(0,1,.5) 
+  j_seq <-seq(0,1,.5)
   
   
   grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
@@ -170,35 +158,28 @@ quantile(as.matrix(correlations_filtered_breast_expression))
     
 for(i in 1:nrow(grid_search)){
       
-      print(grid_search[i,])
+      print(i/nrow(grid_search))
       ## run GRACKLE NMF
-      g_res <- GRACKLE(
-        Y = Y,
+
+      grackle <- GRACKLE(
+        Y = dat$train_expression,
         net_similarity = as.matrix(g_adjacency),
         patient_similarity = pat_sim,
         diff_threshold = 1e-6,
         lambda_1 = grid_search$lambda_1[i],
-        lambda_2 = grid_search$lambda_2[i],
+        lambda_2 =  grid_search$lambda_2[i],
         k = 5, 
         verbose = F,
         beta = .0)
       
-      ## project the test data into W_test
-      W_test <- project_W(min_max_scale(dat$test_expression,min_vals,max_vals) ,g_res$H)
-      
-      ## evaluate sample loadings
-      top_sample_LVs <- sampleLoadingsEvaluation(W_test,dat$test_metadata)
-      print(top_sample_LVs$top)
-        
-      ## evaluate gene loadings
-      top_loadings <- geneLoadingsEvaluation(g_res$H, clusters = clusters, aligned_clusters = large_clusters)
-      print(top_loadings$top)
       
       ## correspondence between selected W LV's and top loading gene modules
-      grid_search$score[i] <- mean(unlist(lapply(1:5, function(x) {
-        if(!(is.na(top_sample_LVs$top[x][[1]])) | is.na(top_loadings$top[x][[1]])) {
-          if(identical(top_sample_LVs$top[x][[1]], top_loadings$top[x][[1]])) { 1} else {0}
-        } })))
+      grid_search$score[i] <- evaluationWrapper(test_expression = dat$test_expression,
+                                                test_metadata = dat$test_metadata,
+                                                H_train = grackle$H,
+                                                k = 5,
+                                                clusters = clusters,
+                                                aligned_clusters = large_clusters)
 }
     
   p1 <- ggplot(grid_search, aes(x = lambda_1, y= lambda_2, fill = score)) +
@@ -210,30 +191,21 @@ for(i in 1:nrow(grid_search)){
     
     
     
-   l_res <- nmf(as.matrix(Y),5,'lee', seed = 42)
-     
-   W_test <-  project_W(min_max_scale(dat$test_expression,min_vals,max_vals), coef(l_res))
-     ## evaluate sample loadings
-     top_sample_LVs <- sampleLoadingsEvaluation(W_test,dat$test_metadata)
-     
-     ## evaluate gene loadings
-     top_loadings <- geneLoadingsEvaluation(g_res$H, clusters = clusters, aligned_clusters = large_clusters)
-  #   
-   ## correspondence between selected W LV's and top loading gene modules
-     mean(unlist(lapply(1:5, function(x) {
-       if(!(is.na(top_sample_LVs$top[x][[1]])) | is.na(top_loadings$top[x][[1]])) {
-         if(identical(top_sample_LVs$top[x][[1]], top_loadings$top[x][[1]])) { 1} else {0}
-       } })))
-
-  #   
-  # 
-  # toplot <- data.frame(noise = seq(.1,.9,.2),  nmf = as.numeric(res[2,]))
-  # library(tidyverse)
-  # toplot <- toplot %>%
-  #   pivot_longer(cols = -noise)
-  # 
-  # ggplot(toplot, aes(x = noise, y = value, color = name)) +
-  #   ylim(c(0,1))+
-  #   geom_line(linewidth = 2) +
-  #   theme_classic()
-  # 
+    nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
+    evaluationWrapper(test_expression = dat$test_expression,
+                      test_metadata = dat$test_metadata,
+                      H_train = nmf$H,
+                      k = 5,
+                      clusters = clusters,
+                      aligned_clusters = large_clusters)
+    
+    grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 200, alpha = .1)
+    evaluationWrapper(test_expression = dat$test_expression,
+                      test_metadata = dat$test_metadata,
+                      H_train = nmf$H,
+                      k = 5,
+                      clusters = clusters,
+                      aligned_clusters = large_clusters)
+    
+    
+    
