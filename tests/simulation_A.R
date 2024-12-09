@@ -1,137 +1,147 @@
-  ### Simulation study A
-  
 ## set seed
 set.seed(42)
 setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
 library(tidyverse)
 library(igraph)
+library(devtools)
+library(ggplot2)
 library(ComplexHeatmap)
-library(parallel)
+load_all()
 
-# # Assign random edge weights based on the distribution of in and out degree over regulatory relationships in GRAND Breast network
-breast_expression <- read.csv("./data/Breast_expression.csv")
-breast_network <- read.csv("./data/Breast_network.csv")
+load("./data/Breast/directed_breast_igraph.RData")
 
-## pivot longer
-breast_network_long <- breast_network %>%
-  pivot_longer(cols = -X)
-
-# ## Remove interactions below a threshold of 1 This threshold is based on the evidence of interaction, regardless of directionality.
-breast_network_long <- breast_network_long %>%
- filter(value >= 1)
-
-# change ensembl ID's to HGNC ID's
-network_symbol_map <- ensemblToHGNC(breast_network_long$name)
-expression_symbol_map <- ensemblToHGNC(breast_expression$X)
-
-breast_network_long <- breast_network_long %>%
-    left_join(network_symbol_map, by = c("name" = "ensembl_gene_id"), relationship = "many-to-many")
-
-breast_network_long <- breast_network_long %>%
-    filter(!is.na(symbol))
-
-breast_network_long <- breast_network_long %>%
-    dplyr::select(X,symbol,value) %>%
-    rename(from = X,to = symbol,probability = value)
-
-breast_expression <- breast_expression %>%
-    left_join(expression_symbol_map, by = c("X" = "ensembl_gene_id"), relationship = "many-to-many")
-
-breast_expression <- breast_expression %>%
-    filter(!is.na(symbol)) %>%
-    select(-X)
-
-## filter expression and network
-unique_genes <- unique(union(breast_network_long$from,breast_network_long$to))
-filtered_breast_expression <- breast_expression %>%
-  filter(symbol %in% unique_genes) %>%
-  column_to_rownames('symbol') %>%
-  t() %>%
-  as.data.frame()
-
-filtered_breast_network_long <- breast_network_long %>%
-  filter(from %in% names(filtered_breast_expression) & to %in% names(filtered_breast_expression))
-
-
-#Calculate the correlation coefficients between pairs of genes to determine
-# directed_breast_network <- makeDirected(filtered_breast_expression,filtered_breast_network_long)
-# save(directed_breast_network, file = "directed_breast_network.RData")
-load("directed_breast_network.RData")
-
-directed_breast_network <- directed_breast_network %>% filter(abs(correlation) > .4)
-
-## remove self loops
-## directed_breast_network <- directed_breast_network %>% filter(from != to)
- 
-## find percent positive and negative edges
-positive_edges_percent <- sum(directed_breast_network$weight > 0)/nrow(directed_breast_network)
-
-# ## Find network properties
-# breast_g <- graph_from_data_frame(directed_breast_network)
-# save(breast_g, file = "directed_breast_igraph.RData")
-load("directed_breast_igraph.RData")
 ## in and out degree of breast network
 in_degrees <- degree(breast_g,mode = "in")
 out_degrees <- degree(breast_g,mode = "out")
 degrees <- degree(breast_g)
-  
+
+pdf("./results/networks/degree_scatter.pdf")
+qplot(y  = seq_along(degrees), x= degrees, geom = "point", ylab = "" ) + theme_classic()
+dev.off()
   
 # generate random breast_g# generate random nework 
 g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
-  
 sm <- sample(E(breast_g)$weight, ecount(g), rep = FALSE)
 E(g)$weight <- sm
 g
+
 is_connected(g)
 components <- decompose(g)
   
 g <- components[[which.max(sapply(components, vcount))]]
 is_connected(g)
+g
+
+## plot network
+pdf("./results/networks/network.pdf")
+plot(
+  g, 
+  vertex.size = 3,  # Adjust node size as needed
+  vertex.label = NA,  # Hide vertex labels for clarity
+  edge.width = 0.3,  # Adjust edge width as needed
+  edge.arrow.size = .15,
+  layout = layout_with_lgl
+)
+dev.off()
+
+
 ## permute modules
 # generate list of permuted networks with distinctly permuted modules
-  
-clusters <- cluster_walktrap(g)
-membership <- cut_at(clusters,no = 100)
+clusters <- cluster_walktrap(g,weights = NA)
+membership <- clusters$membership
 membership_counts <- table(as.factor(membership))
 large_clusters <- names(membership_counts[order(membership_counts, decreasing = T)][1:5])
-  
-  metadata <- as.data.frame(c(rep(1, 20), rep(2, 20), rep(3, 20), rep(4, 20), rep(5,20)))
-  names(metadata) <- "label"
-  rownames(metadata) <- rownames(combined_exp)
-  
-  metadata <- metadata %>%
-    rownames_to_column("sample") %>%  
-    mutate(values = 1) %>%
-    pivot_wider(names_from = label, names_prefix = "group", values_from = values, values_fill = 0) %>%
-    column_to_rownames("sample")
-  
-  save(metadata, file = "./results/simulations/data/metadata/simulated_metadata_100_360.RData")
-  
-  ## explore the increase percentage as it relates to the data separation
-  num_cores <- detectCores() - 1
-  
-  mclapply(seq(.5,4,.5), function(i) {
-    
-    permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_percentage =i ))
-  
-    # simulate gene expression for the permuted networks
-    sim_exp <- lapply(permuted_networks, function(x) simulateExpression(x, iterations = 3, max_expression = 3000, num_samples = 20))
-  
-    ## combine expression data
-    sim_exp <- lapply(sim_exp, as.data.frame)
-    sim_exp <- lapply(sim_exp, function(x) {
-      x %>% rownames_to_column("gene")
-    })
-    combined_exp <- sim_exp %>% reduce(full_join, by = "gene")
-  
-    combined_exp <- combined_exp %>%
-      column_to_rownames("gene")
-    
-  
+
+# Assign colors to each community
+V(g)$color <- membership(clusters)
+
+clusters_to_highlight <- lapply(large_clusters, function(x) clusters[[x]])
+# Plot the graph with module overlay
+pdf("./results/networks/network_modules.pdf")
+plot(
+  clusters, 
+  g, 
+  mark.groups = clusters_to_highlight,
+  vertex.size = 3,  # Adjust node size as needed
+  vertex.label = NA,  # Hide vertex labels for clarity
+  edge.width = 0.3,  # Adjust edge width as needed
+  edge.arrow.size = .15,
+  layout = layout_with_lgl
+)
+dev.off()
+
+## plot a single cluster
+cluster_id <- large_clusters[1]
+
+vertices_in_cluster <- which(membership(clusters) == cluster_id)
+
+# Create a subgraph with only the vertices in the selected cluster
+subgraph <- induced_subgraph(g, vids = vertices_in_cluster)
+
+
+# Plot the subgraph
+pdf("./results/networks/single_module.pdf")
+plot(
+  subgraph, 
+  vertex.size = 10,  # Adjust node size as needed
+  vertex.label = NA,  # Hide vertex labels for clarity
+  edge.width = 0.5,
+  edge.arrow.size = .5,# Adjust edge width as needed,
+  layout = layout_with_lgl
+)
+dev.off()
+
+
  
-      names(combined_exp) <- paste0("sample", 1:ncol(combined_exp))
+## simulate expression using the base network
+base_exp <- parallelSimulateExpression(g,max_expression = 300,num_samples = 50,iterations = 3)
+
+## compare expression value distribution to actual data
+load("./data/Breast/correlation_filtered_breast_expression.RData")
+quantile(as.matrix(correlations_filtered_breast_expression))
+quantile(as.matrix(base_exp))
+
+## simulate metadata
+metadata <- simulateMetadata(group_size = rep(10,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
+
+group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
+ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
+pdf("./results/simulations/plots/full_network_heatmap.pdf")
+Heatmap(as.matrix(base_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
+dev.off()
+
+#permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
+
+# simulate gene expression for the permuted networks
+sim_exp <- lapply(large_clusters, function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 200,num_samples = 3,select_nodes = which(membership == x),perturbation_constant = 3 ))
+
+## combine expression data
+sim_exp <- lapply(sim_exp, as.data.frame)
+
+combined_exp <- do.call(rbind, sim_exp)
+
+rownames(combined_exp) <- paste0("sample", 1:nrow(combined_exp))
+
+## simulate metadata
+metadata <- simulateMetadata(group_size = rep(3,3), group_labels = paste0("subgroup", 1:3), row_names = rownames(combined_exp))
+
+group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
+ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
+ Heatmap(as.matrix(combined_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
+
+pdf("heatmap.pdf")
+draw(p1)
+dev.off()
+
+
+## explore the increase percentage as it relates to the data separation
+num_cores <- detectCores() - 1
   
-    combined_exp <- as.data.frame(t(combined_exp))
+mclapply(seq(.5,4,.5), function(i) {
+    
+
+  
+   
   
     save(combined_exp, file = paste0("./results/simulations/data/expression/", i,"_simulated_expression_100_360.RData"))
   },mc.cores = num_cores )
@@ -140,7 +150,7 @@ large_clusters <- names(membership_counts[order(membership_counts, decreasing = 
   
   
   ## TODO check the quantiles of the simulated expression data against observed expression data
-  # breast_exp_quantiles <- quantile(as.matrix(breast_expression))
+  
   # lapply(sim_exp, quantile)
   
   load("./results/simulations/data/expression/3_simulated_expression_100_360.RData")
