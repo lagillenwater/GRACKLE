@@ -98,100 +98,131 @@ plotSimulatedExpression(base_exp,metadata)
 dev.off()
 #permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
 
-# simulate gene expression for the permuted networks
-sim_exp <- lapply(large_clusters[1:5], function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 4,noise_constant = .7))
-
-## combine expression data
-sim_exp <- lapply(sim_exp, as.data.frame)
-
-combined_exp <- do.call(rbind, sim_exp)
-
-rownames(combined_exp) <- paste0("sample", 1:nrow(combined_exp))
+### noise test
+noise_sequence <- c(seq(0,.8,.1))
 
 
-pdf("./results/simulations/plots/4_permuted_network_heatmap.pdf")
-Heatmap(as.matrix(combined_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
-dev.off()
+set.seed(42)
 
-  ## split the data into train and test
-  g_adjacency <- as_adjacency_matrix(g)  
+noisy_expression <- lapply(noise_sequence, function(z){
+  print(z)
+  # simulate gene expression for the permuted networks
+  sim_exp <- lapply(large_clusters, function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 2.8,noise_constant = z))
+
+  ## combine expression data
+  sim_exp <- lapply(sim_exp, as.data.frame)
+  combined_exp <- do.call(rbind, sim_exp)
+  rownames(combined_exp) <- paste0("sample", 1:nrow(combined_exp))
   
-  set.seed(42)
+  metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = paste0("sample", 1:nrow(combined_exp)))
+
   
-  dat <- split_data(combined_exp, metadata , training_size = .7)
+   return(combined_exp)
+})
+
+names(noisy_expression) <- noise_sequence
+
+lapply(noisy_expression,dim)
+
+metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = paste0("sample", 1:nrow(noisy_expression[[1]])))
+
+lapply(noise_sequence, function(x){
+  pdf(paste0("./results/simulations/plots/permuted_network_heatmap_",x,"_noise.pdf"))
+  print(plotSimulatedExpression(noisy_expression[[as.character(x)]],metadata))
+  dev.off()
+})
+
+save(noisy_expression, file = "./results/simulations/data/noisy_simulations.RData")
+
+## split the data into train and test
+g_adjacency <- as_adjacency_matrix(g)  
+
+noise_simulation_results <- lapply(noisy_expression, function(x) {
   
-  pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
+  results <- sapply(1:10, function(y) {  
     
-  
-  min_vals <- apply(dat$train_expression,2, min)
-  max_vals <- apply(dat$train_expression,2, max)
-
+    dat <- split_data(x, metadata , training_size = .7)
+      
+    pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
+      
+    min_vals <- apply(dat$train_expression,2, min)
+    max_vals <- apply(dat$train_expression,2, max)
+    
     ## min-max scale the input matrix
-  dat$train_expression <-as.matrix( min_max_scale(dat$train_expression,min_vals,max_vals))
-  dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
-  
-  
-  i_seq <-seq(0,1,.5) 
-  j_seq <-seq(0,1,.5)
-  
-  
-  grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
-  names(grid_search) <- c("lambda_1", "lambda_2")
-  grid_search$score <- 0
-  total <- ncol(grid_search) * nrow(grid_search)  
-  
-  
+    dat$train_expression <-as.matrix( min_max_scale(dat$train_expression,min_vals,max_vals))
+    dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
     
-for(i in 1:nrow(grid_search)){
+    
+    i_seq <-seq(0,1,.1) 
+    j_seq <-seq(0,1,.1)
+    
+    grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
+    names(grid_search) <- c("lambda_1", "lambda_2")
+    grid_search$score <- 0
+    total <- ncol(grid_search) * nrow(grid_search)  
+    
+          
+    for(i in 1:nrow(grid_search)){
+          
+          print(i/nrow(grid_search))
+          ## run GRACKLE NMF
+    
+          grackle <- GRACKLE(
+            Y = dat$train_expression,
+            net_similarity = as.matrix(g_adjacency),
+            patient_similarity = pat_sim,
+            diff_threshold = 1e-6,
+            lambda_1 = grid_search$lambda_1[i],
+            lambda_2 =  grid_search$lambda_2[i],
+            k = 5, 
+            verbose = F,
+            beta = .0)
+          
+          
+          ## correspondence between selected W LV's and top loading gene modules
+          grid_search$score[i] <- evaluationWrapper(test_expression = dat$test_expression,
+                                                    test_metadata = dat$test_metadata,
+                                                    H_train = grackle$H,
+                                                    k = 5,
+                                                    clusters = clusters,
+                                                    aligned_clusters = large_clusters)
+    }
+        
+       
+    
+           
+        
+        nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
+        nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
+                          test_metadata = dat$test_metadata,
+                        H_train = nmf$H,
+                        k = 5,
+                        clusters = clusters,
+                        aligned_clusters = large_clusters)
       
-      print(i/nrow(grid_search))
-      ## run GRACKLE NMF
+      grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 200, alpha = .1)
+      grnmf_res <- evaluationWrapper(test_expression = dat$test_expression,
+                        test_metadata = dat$test_metadata,
+                        H_train = grnmf$H,
+                        k = 5,
+                        clusters = clusters,
+                        aligned_clusters = large_clusters)
+      
+      return(list(grid_search = grid_search,plot = p1, nmf_res = nmf_res, grnmf_res = grnmf_res))
+})
+      
+      
+      
+      return(results)
+      
+      
+})
 
-      grackle <- GRACKLE(
-        Y = dat$train_expression,
-        net_similarity = as.matrix(g_adjacency),
-        patient_similarity = pat_sim,
-        diff_threshold = 1e-6,
-        lambda_1 = grid_search$lambda_1[i],
-        lambda_2 =  grid_search$lambda_2[i],
-        k = 5, 
-        verbose = F,
-        beta = .0)
-      
-      
-      ## correspondence between selected W LV's and top loading gene modules
-      grid_search$score[i] <- evaluationWrapper(test_expression = dat$test_expression,
-                                                test_metadata = dat$test_metadata,
-                                                H_train = grackle$H,
-                                                k = 5,
-                                                clusters = clusters,
-                                                aligned_clusters = large_clusters)
-}
-    
-  p1 <- ggplot(grid_search, aes(x = lambda_1, y= lambda_2, fill = score)) +
-    geom_tile() +
-    scale_fill_continuous(limits = c(0,1)) + 
-  theme_classic()    
 
-  ggsave("./results/simulations/scores/heatmap_grid_search_4.pdf",plot = p1)
-    
-    
-    
-    nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
-    evaluationWrapper(test_expression = dat$test_expression,
-                      test_metadata = dat$test_metadata,
-                      H_train = nmf$H,
-                      k = 5,
-                      clusters = clusters,
-                      aligned_clusters = large_clusters)
-    
-    grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 200, alpha = .1)
-    evaluationWrapper(test_expression = dat$test_expression,
-                      test_metadata = dat$test_metadata,
-                      H_train = nmf$H,
-                      k = 5,
-                      clusters = clusters,
-                      aligned_clusters = large_clusters)
-    
-    
-    
+p1 <- ggplot(grid_search, aes(x = lambda_1, y= lambda_2, fill = score)) +
+  geom_tile() +
+  scale_fill_continuous(limits = c(0,1)) + 
+  theme_classic()  
+
+save(noise_simulation_results, file = "./results/simulations/data/NMF_model_results.RData")
+lapply(noise_simulation_results, function(x) x$grnmf_res)

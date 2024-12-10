@@ -75,7 +75,7 @@ modulePermutations <- function(g,membership, module_ids, increase_constant = 1.1
 #' @param perturbation_constant Numberic value to increase initial values of perturbed nodes by. (Default is 1.5)
 #' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @export
-simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = NULL) {
+simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = .3) {
   
   res <- lapply(1:iterations, function(x) {
     # Specifying global reaction parameters.
@@ -96,6 +96,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
     
     if(!is.null(select_nodes)){
       
+      
       # select_degrees <- degree(g, v = select_nodes)
       # high_degree_nodes <- select_nodes[select_degrees > 2]
       # # <- sample(high_degree_nodes,1,replace = F)
@@ -106,7 +107,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
       V(g)$Rpop[nodes] <- V(g)$Rpop[nodes] * perturbation_constant
     }
       
-    if(!is.null(noise_constant)){
+    if(noise_constant > 0){
       noise_nodes <- n_nodes* noise_constant
       other_nodes <- sample(V(g)[-select_nodes],noise_nodes) 
   
@@ -145,7 +146,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
 #' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @return data frame of simulated gene expression data
 #' @export
-parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = NULL) {
+parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = .3) {
   num_cores <- detectCores() - 1
   res <- mclapply(1:num_samples, function(x) {
     simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
@@ -250,7 +251,9 @@ plotSimulatedExpression <- function(expression,metadata){
   colors <- brewer.pal(length(subgroups), "Set1")
   group_colors <- setNames(colors, subgroups)
   ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
-  h1 <- Heatmap(as.matrix(base_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
+  h1 <- Heatmap(as.matrix(expression), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
   return(h1)
 
 }
+
+

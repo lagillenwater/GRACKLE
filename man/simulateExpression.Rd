@@ -11,7 +11,7 @@ simulateExpression(
   rc = NULL,
   select_nodes = NULL,
   perturbation_constant = 1.5,
-  noise_constant = NULL
+  noise_constant = 0.3
 )
 }
 \arguments{
