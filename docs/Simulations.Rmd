@@ -1,0 +1,46 @@
+---
+title: "GRACKLE - Simulation results"
+author: "Lucas Gillenwater"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(ComplexHeatmap)
+library(tidyverse)
+```
+
+# Simulation 1
+## Experimental Design Overview
+
+- Random network of size 100 samples by 360 genes
+  - Network matches properties of breast tissue network derived using PUMA based on GTEX data and reweighted based on the partial correlation coefficients. The partial correlation coefficients are necessary because each gene may be affected by the action of multiple TF's. Therfore, finding the direct correlation does not explain the effect of other transcription factors on the gene counts. The partial correlation coefficient calculates the correlation adjusted for the effect of all other known binding factors, as defined by those relationships in the PUMA based network with edge weights > 1. To filter the network to the reported size above, we further filter based on the correlation coefficients. 
+  
+- Cluster random network to identify modules using
+[cluster_walktrap](https://igraph.org/r/doc/cluster_walktrap.html). Currently I am clustering for 100 modules and selecting the 5 larger ones. 
+  - This clustering algorithm allows for future combinations of clusters to simulate shared assignments across clusters. 
+
+- Permute the edges in the network to simulate upregulation in particular modules of gene-gene interactions.
+  - Metadata is a assigned based on the module permuted. For example, if we upregulate the regulatory effects of genes in "module 1", then we would assign the simulated samples as "subgroup 1". See below for information on the gene.
+
+- Expression simulated with 
+[sgnesR](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-017-1731-8#Sec3), using the base parameters from the package shown below. These rates may be problematic, since they are likely based on bacterial data. Quote from the paper: 
+
+> The delays itself can be drawn from a variety of distributions and the reaction rates can be determined via complex functions or from physical parameters. 
+
+```{r, echo=TRUE}
+    # Specifying the reaction rate constant vector for following reactions: (1) Translation rate, (2) RNA degradation rate, (3) Protein degradation rate, (4) Protein binding rate, (5) unbinding rate, (6) transcription rate.
+
+# Rates are per 
+    rc <- c(0.002, 0.005, 0.005, 0.005, 0.01, 0.02)
+```
+  - To ensure that there is adequate variation across the simulated data, the expression data is averaged over multiple simulations with random starting points. 
+- There is a question as to what scale of simulated upregulation leads to separation of the samples. Therefore, I explored the separation from scaling module gene-gene interaction weights between 0.5 and 4. 
+
+
+
+  
+
+
+
