@@ -17,7 +17,8 @@ Imports:
 	parallel,
 	sgnesR,
 	ppcor,
-	FNN
+	FNN,
+	NMF
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)
