@@ -10,7 +10,7 @@
 #' @export
 #' 
 randomNetwork <- function(prior_graph, connected = TRUE){
-  
+  set.seed(42)
   in_degrees <- degree(prior_graph,mode = "in")
   out_degrees <- degree(prior_graph,mode = "out")
   g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
