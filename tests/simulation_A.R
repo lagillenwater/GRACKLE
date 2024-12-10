@@ -1,6 +1,6 @@
 ## set seed
 set.seed(42)
-setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
+#setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
 library(tidyverse)
 library(igraph)
 library(devtools)
@@ -23,18 +23,21 @@ membership <- clusters$membership
 membership_counts <- table(as.factor(membership))
 large_clusters <- names(membership_counts[order(membership_counts, decreasing = T)][1:5])
 ## simulate metadata
-metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
+
+
 
 noise_sequence <- c(seq(0,.8,.1))
 
 load("./results/simulations/data/noisy_simulations.RData")
 
+metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(noisy_expression[[1]]))
+
 ## split the data into train and test
 g_adjacency <- as_adjacency_matrix(g)  
 
-noise_simulation_results <- lapply(noisy_expression, function(x) {
+noise_simulation_results <- mclapply(noisy_expression, function(x) {
   
-  results <- mclapply(1:10, function(y) {  
+  results <- mclapply(1:2, function(y) {  
     
     dat <- split_data(x, metadata , training_size = .7)
       
@@ -107,14 +110,14 @@ noise_simulation_results <- lapply(noisy_expression, function(x) {
       
 
       return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
-}, mc.cores = detectCores() - 4)
+}, mc.cores = 2)
       
       
       
       return(results)
       
       
-})
+}, mc.cores = 10)
 
 
 
