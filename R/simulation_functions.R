@@ -236,3 +236,21 @@ simulateMetadata <- function(group_size, group_labels, row_names) {
 
   return(metadata)
 }
+
+#' plotSimulatedExpression
+#' 
+#' @description plots heatmap of simulated expression
+#' @importFrom RColorBrewer brewer.pal
+#' @param expression simulated gene expression data. sample X genes
+#' @param metadata simulated metadata. sample by column
+#' @return
+#' @export
+plotSimulatedExpression <- function(expression,metadata){
+  subgroups <- names(metadata)
+  colors <- brewer.pal(length(subgroups), "Set1")
+  group_colors <- setNames(colors, subgroups)
+  ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
+  h1 <- Heatmap(as.matrix(base_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
+  return(h1)
+
+}

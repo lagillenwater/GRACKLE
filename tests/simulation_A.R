@@ -93,12 +93,9 @@ quantile(as.matrix(base_exp))
 ## simulate metadata
 metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
 
-group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
-ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
 pdf("./results/simulations/plots/full_network_heatmap.pdf")
-Heatmap(as.matrix(base_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
+plotSimulatedExpression(base_exp,metadata)
 dev.off()
-
 #permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
 
 # simulate gene expression for the permuted networks
@@ -111,22 +108,11 @@ combined_exp <- do.call(rbind, sim_exp)
 
 rownames(combined_exp) <- paste0("sample", 1:nrow(combined_exp))
 
-## simulate metadata
-metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(combined_exp))
-
-group_colors <- c("subgroup1" = "black",  "subgroup2" ="darkorange", "subgroup3" ="darkgreen","subgroup4" ="red","subgroup5" ="blue")
-ha <- rowAnnotation(subgroup = metadata %>% pivot_longer(cols = everything()) %>% filter(value == 1) %>% .$name, col = list(subgroup = group_colors), show_legend = FALSE)
 
 pdf("./results/simulations/plots/4_permuted_network_heatmap.pdf")
 Heatmap(as.matrix(combined_exp), right_annotation = ha, show_row_names = FALSE, show_column_names = FALSE, show_heatmap_legend = FALSE )
 dev.off()
 
-quantile(as.matrix(combined_exp))
-quantile(as.matrix(correlations_filtered_breast_expression))
-
-
-  
-  
   ## split the data into train and test
   g_adjacency <- as_adjacency_matrix(g)  
   
