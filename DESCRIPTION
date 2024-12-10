@@ -18,7 +18,8 @@ Imports:
 	sgnesR,
 	ppcor,
 	FNN,
-	NMF
+	NMF,
+	RColorBrewer
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)
