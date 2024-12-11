@@ -8,11 +8,13 @@ library(ggplot2)
 library(ComplexHeatmap)
 load_all()
 
-load( "./results/simulations/data/NMF_model_results.RData")
+load( "./results/simulation_A/data/NMF_model_results.RData")
+
+noise_sequence <- seq(0,.8,.1)
 
 merged_grid_search_scores <- lapply(noise_simulation_results, function(x){
-  grid_searches <- x["grid_search",1:10]
-  merged_grid_searches <- reduce(grid_searches,full_join, by = c("lambda_1", "lambda_2"))
+  grid_searches <- lapply(x, function(y) x[[1]]$grid_search)
+  merged_grid_searches <- grid_searches %>%  reduce(full_join, by = c("lambda_1", "lambda_2"))
   merged_scores <- merged_grid_searches %>%
     rowwise() %>%
     mutate(avg_score = mean(c_across(-c("lambda_1", "lambda_2")), na.rm = TRUE)) %>%
@@ -23,14 +25,14 @@ merged_grid_search_scores <- lapply(noise_simulation_results, function(x){
 names(merged_grid_search_scores) <- noise_sequence
 
 merged_nmf_scores <- lapply(noise_simulation_results, function(x){
-  nmf_scores <- x["nmf_res",1:10]
+  nmf_scores <- lapply(x, function(y) x[[1]]$nmf_res)
   mean(unlist(nmf_scores), na.rm = T)
   
 })
 
 
 merged_grnmf_scores <- lapply(noise_simulation_results, function(x){
-  grnmf_scores <- x["grnmf_res",1:10]
+  grnmf_scores <- lapply(x, function(y) x[[1]]$grnmf_res)
   mean(unlist(grnmf_scores), na.rm = T)
   
 })
@@ -61,5 +63,5 @@ benchmark_data <- benchmark_data %>%
 p1 <- ggplot(benchmark_data, aes(x = noise_percentage, LV_alignment, color =  Algorithm)) +
   geom_line(linewidth = 3) + 
   theme_classic()
-ggsave("./results/simulations/benchmarks/simulation_1_benchmarks.pdf", p1)
+ggsave("./results/simulation_A/benchmarks/simulation_1_benchmarks.pdf", p1)
 
