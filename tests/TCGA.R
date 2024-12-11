@@ -45,6 +45,10 @@ save(metadata, file = "./data/Breast/TCGA/Breast_metadata.RData")
 # View the gene expression data
 expression_data <- assay(gene_expression_data, "tpm_unstrand")
 
+
+## filter by variance
+
+
 library(tidyverse)
 
 expression_data <- expression_data %>%
@@ -69,8 +73,11 @@ expression_data <- expression_data %>%
 
 save(expression_data, file = "./data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
+directed_breast_network <- directed_breast_network %>%
+  filter(from %in% rownames(expression_data) & to %in% rownames(expression_data))
 
 library(igraph)
+
 directed_breast_g_with_PAM50 <- graph_from_data_frame(directed_breast_network %>% dplyr::select(from,to,weight), directed = TRUE)
 save(directed_breast_g_with_PAM50, file = "./data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
 
