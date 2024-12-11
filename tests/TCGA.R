@@ -46,9 +46,6 @@ save(metadata, file = "./data/Breast/TCGA/Breast_metadata.RData")
 expression_data <- assay(gene_expression_data, "tpm_unstrand")
 
 
-## filter by variance
-
-
 library(tidyverse)
 
 expression_data <- expression_data %>%
@@ -62,7 +59,8 @@ expression_data <- expression_data %>%
   left_join(hgnc_map, by = c("ensembl_ids" = "ensembl_gene_id"),relationship = "many-to-many") %>%
   distinct(symbol, .keep_all = T) %>%
   column_to_rownames("symbol") %>%
-  select(-ensembl_ids)
+  dplyr::select(-ensembl_ids)
+
 
 
 load("./data/Breast/directed_breast_network.RData")  
@@ -70,6 +68,13 @@ load("./data/Breast/directed_breast_network.RData")
 expression_data <- expression_data %>%
   filter(rownames(.) %in% union(directed_breast_network$from,directed_breast_network$to))
 
+
+## filter by variance
+variance <- apply(expression_data,1,var)
+tokeep <- variance[order(variance, decreasing = T)][1:5000]
+length(tokeep)
+expression_data <- expression_data %>%
+  filter(rownames(.) %in% names(tokeep))
 
 save(expression_data, file = "./data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
