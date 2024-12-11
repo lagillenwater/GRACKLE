@@ -29,11 +29,14 @@ breast_g_adjacency <- as_adjacency_matrix(directed_breast_g_with_PAM50)
 
 load("./data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
-results <- mclapply(1:10, function(y) {
+expression <- as.data.frame(t(expression_data))
+
+
+## results <- mclapply(1:10, function(y) {
     
-    dat <- split_data(x, metadata , training_size = .7)
+dat <- split_data(expression, breast_subtype_metadata , training_size = .7)
     
-    pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
+   pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
     
     min_vals <- apply(dat$train_expression,2, min)
     max_vals <- apply(dat$train_expression,2, max)
@@ -49,19 +52,19 @@ results <- mclapply(1:10, function(y) {
     grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
     names(grid_search) <- c("lambda_1", "lambda_2")
     grid_search$score <- 0
-    total <- ncol(grid_search) * nrow(grid_search)
+#    total <- ncol(grid_search) * nrow(grid_search)
     
-    print(y)
+
     
-    for(i in 1:nrow(grid_search)){
-      
+#    for(i in 1:nrow(grid_search)){
+    scores <- mclapply(  1:nrow(grid_search), function(i) {
       #   print(i/nrow(grid_search))
       
       ## run GRACKLE NMF
       
       grackle <- GRACKLE(
         Y = dat$train_expression,
-        net_similarity = as.matrix(g_adjacency),
+        net_similarity = as.matrix(breast_g_adjacency),
         patient_similarity = pat_sim,
         diff_threshold = 1e-6,
         lambda_1 = grid_search$lambda_1[i],
@@ -72,47 +75,43 @@ results <- mclapply(1:10, function(y) {
       
       
       ## correspondence between selected W LV's and top loading gene modules
-      grid_search$score[i] <- evaluationWrapper(test_expression = dat$test_expression,
+      score <- evaluationWrapper(test_expression = dat$test_expression,
                                                 test_metadata = dat$test_metadata,
                                                 H_train = grackle$H,
                                                 k = 5,
                                                 clusters = clusters,
-                                                aligned_clusters = large_clusters)
-    }
-    
-    
-    
-    
-    
-    nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
-    nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
-                                 test_metadata = dat$test_metadata,
-                                 H_train = nmf$H,
-                                 k = 5,
-                                 clusters = clusters,
                                  aligned_clusters = large_clusters)
-    
-    grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 200, alpha = .1)
-    grnmf_res <- evaluationWrapper(test_expression = dat$test_expression,
-                                   test_metadata = dat$test_metadata,
-                                   H_train = grnmf$H,
-                                   k = 5,
-                                   clusters = clusters,
-                                   aligned_clusters = large_clusters)
-    
-    
-    return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
-  }, mc.cores = 10)
-  
-  
-  
-  return(results)
-  
-  
-}, mc.cores = 3)
+        return(score)
+#    }
+    }, mc.cores = 10)   
 
+    
+##    grid_search$score <- unlist(scores)
+  print(scores)  
+    
+##     nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
+##     nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
+##                                  test_metadata = dat$test_metadata,
+##                                  H_train = nmf$H,
+##                                  k = 5,
+##                                  clusters = clusters,
+##                                  aligned_clusters = large_clusters)
+    
+##     grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 200, alpha = .1)
+##     grnmf_res <- evaluationWrapper(test_expression = dat$test_expression,
+##                                    test_metadata = dat$test_metadata,
+##                                    H_train = grnmf$H,
+##                                    k = 5,
+##                                    clusters = clusters,
+##                                    aligned_clusters = large_clusters)
+    
+    
+##     return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
+##   }, mc.cores = 3)
+  
+  
+  
 
-
-save(noise_simulation_results, file = "./results/simulations/data/NMF_model_results.RData")
+## save(results, file = "./results/simulations/data/TCGA_results.RData")
 
 
