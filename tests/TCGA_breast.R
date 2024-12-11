@@ -46,18 +46,18 @@ dat <- split_data(expression, breast_subtype_metadata , training_size = .7)
     dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
     
     
-    i_seq <-seq(0,1,.1)
-    j_seq <-seq(0,1,.1)
+    ## i_seq <-seq(0,1,.1)
+    ## j_seq <-seq(0,1,.1)
     
-    grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
-    names(grid_search) <- c("lambda_1", "lambda_2")
-    grid_search$score <- 0
+    ## grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
+    ## names(grid_search) <- c("lambda_1", "lambda_2")
+    ## grid_search$score <- 0
 #    total <- ncol(grid_search) * nrow(grid_search)
     
 
     
 #    for(i in 1:nrow(grid_search)){
-    scores <- mclapply(  1:nrow(grid_search), function(i) {
+## scores <- mclapply(  1:nrow(grid_search), function(i) {
       #   print(i/nrow(grid_search))
       
       ## run GRACKLE NMF
@@ -81,13 +81,13 @@ dat <- split_data(expression, breast_subtype_metadata , training_size = .7)
                                                 k = 5,
                                                 clusters = clusters,
                                  aligned_clusters = large_clusters)
-        return(score)
+##        return(score)
 #    }
-    }, mc.cores = 10)   
+    ## }, mc.cores = 10)   
 
     
 ##    grid_search$score <- unlist(scores)
-  print(scores)  
+  print(score)  
     
 ##     nmf <- runNMF(dat$train_expression,5, "lee", seed = 42)
 ##     nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
