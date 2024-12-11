@@ -18,7 +18,7 @@ qplot(y  = seq_along(degrees), x= degrees, geom = "point", ylab = "" ) + theme_c
 dev.off()
 
 # generate random breast_g# generate random nework 
-g <- randomNetwork(prior_graph = breast_g)
+g <- randomNetwork(prior_graph = breast_g, num_nodes = 400)
 
 ## plot network
 pdf("./results/networks/network.pdf")
@@ -38,6 +38,7 @@ dev.off()
 clusters <- cluster_walktrap(g,weights = NA)
 membership <- clusters$membership
 membership_counts <- table(as.factor(membership))
+print(membership_counts)
 large_clusters <- names(membership_counts[order(membership_counts, decreasing = T)][1:5])
 
 # Assign colors to each community
@@ -80,30 +81,13 @@ plot(
 dev.off()
 
 
-
-## simulate expression using the base network
-base_exp <- parallelSimulateExpression(g,max_expression = 300,num_samples = 100,iterations = 3)
-
-## compare expression value distribution to actual data
-load("./data/Breast/correlation_filtered_breast_expression.RData")
-quantile(as.matrix(correlations_filtered_breast_expression))
-quantile(as.matrix(base_exp))
-
-## simulate metadata
-metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(base_exp))
-
-pdf("./results/simulations/plots/full_network_heatmap.pdf")
-plotSimulatedExpression(base_exp,metadata)
-dev.off()
-#permuted_networks <- lapply(large_clusters, function(x) modulePermutations(g,membership,x, increase_constant = 2 ))
-
 ### noise test
 noise_sequence <- c(seq(0,.8,.1))
 
-noisy_expression <- lapply(noise_sequence, function(z){
+noisy_expression <- mclapply(noise_sequence, function(z){
   print(z)
   # simulate gene expression for the permuted networks
-  sim_exp <- lapply(large_clusters, function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 2.8,noise_constant = z))
+  sim_exp <- mclapply(large_clusters, function(x) parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = 20,select_nodes = which(membership == x),perturbation_constant = 2.8,noise_constant = z), mc.cores = length(large_clusters))
   
   ## combine expression data
   sim_exp <- lapply(sim_exp, as.data.frame)
@@ -114,7 +98,7 @@ noisy_expression <- lapply(noise_sequence, function(z){
   
   
   return(combined_exp)
-})
+}, mc.cores = length(noise_sequence))
 
 names(noisy_expression) <- noise_sequence
 
@@ -132,7 +116,6 @@ save(noisy_expression, file = "./results/simulations/data/noisy_simulations.RDat
 
 noise_sequence <- c(seq(0,.8,.1))
 
-
 metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(noisy_expression[[1]]))
 
 ## split the data into train and test
@@ -140,7 +123,7 @@ g_adjacency <- as_adjacency_matrix(g)
 
 noise_simulation_results <- mclapply(noisy_expression, function(x) {
 
-  results <- mclapply(1:2, function(y) {
+  results <- mclapply(1:10, function(y) {
 
     dat <- split_data(x, metadata , training_size = .7)
 
@@ -213,14 +196,14 @@ noise_simulation_results <- mclapply(noisy_expression, function(x) {
 
 
       return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
-}, mc.cores = 2)
+}, mc.cores = 10)
 
 
 
       return(results)
 
 
-}, mc.cores = 10)
+}, mc.cores = 3)
 
 
 
