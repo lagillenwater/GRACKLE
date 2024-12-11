@@ -67,11 +67,11 @@ dat <- split_data(expression, breast_subtype_metadata , training_size = .7)
         net_similarity = as.matrix(breast_g_adjacency),
         patient_similarity = pat_sim,
         diff_threshold = 1e-6,
-        lambda_1 = grid_search$lambda_1[i],
-        lambda_2 =  grid_search$lambda_2[i],
+        lambda_1 =0, # grid_search$lambda_1[i],
+        lambda_2 =0, #  grid_search$lambda_2[i],
         k = 5,
-        verbose = F,
-        beta = .0)
+        verbose = T,
+        beta = 0)
       
       
       ## correspondence between selected W LV's and top loading gene modules
