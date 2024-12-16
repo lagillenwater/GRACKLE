@@ -6,11 +6,11 @@
 #' @description
 #' alignNetwork is a function for reading in, filtering, and otherwise processing GRNs downloaded from GRAND for use in GRACKLE.
 #' 
+#' @import dplyr
 #' @param expression_file GTEX expression file, downloaded from GRAND. (For example, see https://grand.networkmedicine.org/tissues/Breast_tissue/)
 #' @param adjacency_file Network adjacency downloaded from GRAND. (For exampple, see https://grand.networkmedicine.org/tissues/Breast_tissue/)
 #' @param probability_threshold Number to threshold the filtering of the graph edge weights. (Default =1)
 #' @param tissue String of the tissue type for the GRN and expression data
-#' @return 
 #' @export
 
 alignNetwork <- function(expression_file, adjacency_file, probability_threshold = 1, tissue){
