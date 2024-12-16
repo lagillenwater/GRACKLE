@@ -2,7 +2,7 @@
 
 ## set seed
 set.seed(42)
-setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
+#setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
 library(tidyverse)
 library(igraph)
 library(devtools)
@@ -61,7 +61,7 @@ save(directed_breast_network, file = "./data/Breast/directed_breast_network.RDat
 
 ## Filter by correlation for simulation experiments
 load("./data/Breast/directed_breast_network.RData")
-directed_breast_network <- directed_breast_network %>% filter(abs(correlation) > .42)
+directed_breast_network <- directed_breast_network %>% filter(abs(correlation) > .2)
 
 # some specific modifications for sgnesR. Expression simulator only takes 1 and -1 weights. 
 directed_breast_network$weight <- ifelse(directed_breast_network$weight > 0,1,-1)

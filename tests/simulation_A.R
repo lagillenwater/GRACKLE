@@ -1,6 +1,6 @@
 ## set seed
-set.seed(42)
-#setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
+## set.seed(42)
+## setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
 library(tidyverse)
 library(igraph)
 library(devtools)
@@ -111,21 +111,21 @@ lapply(noise_sequence, function(x){
 })
 
 save(noisy_expression, file = "./results/simulations/data/noisy_simulations.RData")
-
+load( "./results/simulations/data/noisy_simulations.RData")
 
 
 noise_sequence <- c(seq(0,.8,.1))
 
-metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(noisy_expression[[1]]))
+ metadata <- simulateMetadata(group_size = rep(20,5), group_labels = paste0("subgroup", 1:5), row_names = rownames(noisy_expression[[1]]))
 
-## split the data into train and test
+##split the data into train and test
 g_adjacency <- as_adjacency_matrix(g)
 
 noise_simulation_results <- mclapply(noisy_expression, function(x) {
 
-  results <- mclapply(1:10, function(y) {
+  results <- mclapply(1:100, function(y) {
 
-    dat <- split_data(x, metadata , training_size = .7)
+      dat <- split_data(x, metadata , training_size = .7)
 
     pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
 
@@ -195,18 +195,20 @@ noise_simulation_results <- mclapply(noisy_expression, function(x) {
                         aligned_clusters = large_clusters)
 
 
-      return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
-}, mc.cores = 10)
+            return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
+      
+ }, mc.cores = 10)
 
 
 
       return(results)
 
 
-}, mc.cores = 3)
+ }, mc.cores = 3)
 
 
 
-save(noise_simulation_results, file = "./results/simulations/data/NMF_model_results.RData")
+ save(noise_simulation_results, file = "./results/simulations/data/NMF_model_results.RData")
+
 
 
