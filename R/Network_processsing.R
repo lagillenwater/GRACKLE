@@ -19,13 +19,15 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
   filtered_network_file <- paste0("./data/", tissue, "_filtered_network_prob_", probability_threshold,".RData")
 
   if(file.exists(filtered_expression_file)){
+    print("found filtered files")
     load(filtered_expression_file)
     load(filtered_network_file)
   } else {
-                                           
+    print("reading in expression and network files")            
     expression <- read.csv(expression_file)
     network <- read.csv(adjacency_file)
     
+    print("filtering")
     ## pivot longer
     network_long <- network %>%
       pivot_longer(cols = -X)
@@ -66,16 +68,19 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
     
     filtered_network_long <- network_long %>%
       filter(from %in% names(filtered_expression) & to %in% names(filtered_expression))
-    
+    print("saving files")
     save(filtered_breast_network_long, file = filtered_network_file)  
     save(filtered_expression, file = filtered_expression_file)
+    print("done")
   } 
   
   directed_network_file = paste0("./data/", tissue, "_directed_network_", probability_threshold,".RData")
   
   if(file.exists(directed_network_file)){
+    print("found directed network")
     load(directed_network_file)
   } else {
+    print("creating directed network")
    #Calculate the correlation coefficients between pairs of genes to determine
    directed_network <- makeDirected(filtered_expression,filtered_network_long)
    save(directed_network, file = directed_network_file)
