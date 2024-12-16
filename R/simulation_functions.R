@@ -167,58 +167,6 @@ parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, 
     
 }
 
-#' makeDirected
-#' 
-#' @description makedDirected is a function for  calculating the pairwise correlations coefficients between genes and assigning direction to the network based on correlation. 
-#' @importFrom parallel detectCores  mclapply
-#' @importFrom ppcor pcor
-#' @importFrom dplyr filter %>% select arrange mutate
-#' @param expression Data Frame of gene expression data
-#' @param network Data Frame of the network edgelist with column names 'from', 'to', 'weight'.
-#' @return Dataframe of network edgelist with directed weights
-#' @export
-makeDirected <- function(expression,network) {
-    
-  ## arrange network by targets
-  network <- network %>%
-    arrange(to)
-  ## identify the target genes
-  targets <- unique(network$to)
-  
-  ## find number of cores for parallelization
-  num_cores <- detectCores() - 1
-  correlations <- mclapply( targets, function(i) {
-    ## filter network by targets
-    tmp_network <- network %>%
-      filter(to == i)
-    tmp_expression <- expression %>%
-      dplyr::select(c(tmp_network$from,i))
-        
-    ## calculate the partial correlations
-    partial_correlations <- suppressWarnings(pcor(tmp_expression)$estimate)
-    colnames(partial_correlations) <- names(tmp_expression)
-    rownames(partial_correlations) <- names(tmp_expression)
-    
-    ## 
-    res <- partial_correlations %>%
-      as.data.frame  %>%
-      dplyr::select(i)
-
-    if(!(i %in% tmp_network$from)) {
-      res <- res %>%
-        filter(rownames(.) != i)
-    }
-    
-    return(res)
-    
-  },mc.cores = num_cores)
-  
-  network$correlation <- c(unlist(correlations))
-  network <- network %>%
-    mutate(weight = ifelse(correlation > 0, probability,-probability))
-  
-  return(network)
-}
 
 
 #' simulateMetadata
