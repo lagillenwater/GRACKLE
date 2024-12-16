@@ -16,7 +16,7 @@ merged_grid_search_scores <- lapply(noise_simulation_results, function(x){
   grid_searches <- lapply(x, function(y) x[[1]]$grid_search)
   merged_grid_searches <- grid_searches %>%  reduce(full_join, by = c("lambda_1", "lambda_2"))
   merged_scores <- merged_grid_searches %>%
-    rowwise() %>%
+    rowwise()  %>%
     mutate(avg_score = mean(c_across(-c("lambda_1", "lambda_2")), na.rm = TRUE)) %>%
     select(lambda_1, lambda_2, avg_score)
                                  
@@ -53,7 +53,12 @@ top_grackle_scores <- lapply(merged_grid_search_scores, function(x) {
 })
 
 
-benchmark_data <- cbind(noise_percentage = noise_sequence, GRACKLE = unlist(top_grackle_scores), NMF = unlist(merged_nmf_scores), GRNMF = unlist(merged_grnmf_scores))
+avg_grackle_scores <- lapply(merged_grid_search_scores, function(x) {
+ mean(x$avg_score)
+})
+
+
+benchmark_data <- cbind(noise_percentage = noise_sequence, TOP_GRACKLE = unlist(top_grackle_scores), AVG_GRACKLE= unlist(avg_grackle_scores), NMF = unlist(merged_nmf_scores), GRNMF = unlist(merged_grnmf_scores))
 
 benchmark_data <- benchmark_data %>%
   as.data.frame() %>%
@@ -64,4 +69,12 @@ p1 <- ggplot(benchmark_data, aes(x = noise_percentage, LV_alignment, color =  Al
   geom_line(linewidth = 3) + 
   theme_classic()
 ggsave("./results/simulation_A/benchmarks/simulation_1_benchmarks.pdf", p1)
+
+
+p2 <- ggplot(benchmark_data, aes(x = noise_percentage, LV_alignment, color =  Algorithm)) +
+  geom_line(linewidth = 3) + 
+  theme_classic()
+ggsave("./results/simulation_A/benchmarks/simulation_1_benchmarks.pdf", p1)
+
+
 

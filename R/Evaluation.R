@@ -147,7 +147,6 @@ sampleLoadingsEvaluation <- function(W_test, test_metadata) {
   subgroups <- names(test_metadata)
   
     ## calculate the module scores
-  ## TODO : deal with cases of zero values in subgroup
   subgroup_scores <- lapply(subgroups, function(i) {
     subgroup_samples <- rownames(test_metadata)[test_metadata[,i] == 1]
     num_samples = length(subgroup_samples)
@@ -158,7 +157,7 @@ sampleLoadingsEvaluation <- function(W_test, test_metadata) {
     } else if(num_samples ==1) {
       W_test[subgroup_samples,]
     } else {
-      colSums(W_test[subgroup_samples,])
+      colSums(W_test[rownames(W_test) %in% subgroup_samples,])
     }
   })
   

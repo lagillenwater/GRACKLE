@@ -71,7 +71,7 @@ expression_data <- expression_data %>%
 
 ## filter by variance
 variance <- apply(expression_data,1,var)
-tokeep <- variance[order(variance, decreasing = T)][1:5000]
+tokeep <- variance[order(variance, decreasing = T)][1:2000]
 length(tokeep)
 expression_data <- expression_data %>%
   filter(rownames(.) %in% names(tokeep))

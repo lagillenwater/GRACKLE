@@ -6,6 +6,7 @@
 #' runNMF runs the version of NMF from the NMF package. 
 #'
 #' @import NMF
+#' @import doParallel
 #' @param expression_matrix Matrix of gene expression data (samples as rows, genes as columns)
 #' @param k A numeric variable representing the number of latent variables (aka, rank). Default is 5.
 #' @param method A string representing the nmf algorithm to run. See nmf for options. Default is 'lee'.
@@ -15,7 +16,15 @@
 #' \item{W}{The matrix \code{W} obtained from the NMF calculation.}
 #' @export
 runNMF <- function(expression_matrix,k = 5, method = 'lee', seed = 42) {
-  res <- nmf(expression_matrix,rank = k,method = method, seed = seed)
+ 
+  cl <- makeCluster(detectCores() - 10)  # Use all but one core
+  registerDoParallel(cl)
+  
+  # Run NMF with parallel computing
+  res <- nmf(x, rank, nrun = 30, .options = "p")
+  
+  # Stop the cluster
+  stopCluster(cl)
   W <- basis(res)
   H <- coef(res)
   return(list(W = W,H = H))
@@ -56,9 +65,24 @@ runGRNMF <- function(expression_matrix, k = 5,  seed = 42, max_iter = 200, alpha
       W <- W * (expression_matrix %*% t(H)) / (W %*% H %*% t(H))
   }
   
-  
-  
-  # Extract the basis and coefficient matrices
+    # Extract the basis and coefficient matrices
   return(list(W =  W, H = H))
   
 } 
+
+#' runPLIER
+#' 
+#' runPLIER implements a version of PLIER for comparison. 
+#'
+#' @import PLIER
+#' @param expression_matrix Matrix of gene expression data (samples as rows, genes as columns)
+#' @param k A numeric variable representing the number of latent variables (aka, rank). Default is 5.
+#' @return
+#' @export
+runPLIER <- function(expression_matrix, k) {
+  data(canonicalPathways)
+  res <- PLIER(data = expression_matrix,priorMat = canonicalPathways,k,rseed = 42)
+  W= res$B
+  H = res$Z
+  return(list(W =  W, H = H))
+}
