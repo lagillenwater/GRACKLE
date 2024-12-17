@@ -90,23 +90,33 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
    save(directed_network, file = directed_network_file)
   }
 
-    directed_network <- directed_network %>% filter(abs(pvalue) > correlation_threshold)
+    igraph_file = paste0( "./data/", tissue,"_igraph_prob_", probability_threshold, "_cor",correlation_threshold,".RData")
+
+    if(file.exists(igraph_file)) {
+        print("found igraph file")
+    } else {
     
-   # 
-   # # some specific modifications for sgnesR. Expression simulator only takes 1 and -1 weights. 
-   # directed_network$weight <- ifelse(directed_network$weight > 0,1,-1)
-   # directed_network <- directed_network %>%
-   #   select(from,to,weight)
-   # 
-   # 
-   # correlations_filtered_expression <- filtered_expression %>%
-   #   dplyr::select( union(directed_network$from, directed_network$to))
-   # save(correlations_filtered_expression, file = "./data/Breast/correlation_filtered_expression.RData")
-   # 
-   # # ## Turn into igraph
-   # breast_g <- graph_from_data_frame(directed_network)
-   # save(breast_g, file = "./data/Breast/directed_breast_igraph.RData")
-       
+        directed_network <- directed_network %>% filter(abs(pvalue) > correlation_threshold)
+        print("filtering by correlation")
+        
+        ##   some specific modifications for sgnesR. Expression simulator only takes 1 and -1 weights. 
+        directed_network$weight <- ifelse(directed_network$weight > 0,1,-1)
+        directed_network <- directed_network %>%
+            select(from,to,weight)
+        
+        
+        correlations_filtered_expression <- filtered_expression %>%
+            dplyr::select( union(directed_network$from, directed_network$to))
+        save(correlations_filtered_expression, file = paste0( "./data/", tissue,"_correlation_filtered_expression_prob_", probability_threshold, "_cor",correlation_threshold,".RData"))
+
+
+                                        # ## Turn into igraph
+        g <- graph_from_data_frame(directed_network)
+        save(g, file = igraph_file)
+
+             print("saving igraph object")
+    }
+    print("done")
 }
 
 
@@ -130,11 +140,12 @@ makeDirected <- function(expression,network) {
 
    n_targets <- length(targets)
   ## find number of cores for parallelization
-  num_cores <- detectCores() - 4
-    correlations <- mclapply(targets, function(i) {
+#  num_cores <- 4
+    correlations <- lapply(targets, function(i) {
 
         n <- which(targets == i)
-        if(n %% 10 == 0) {    print(n/n_targets)} 
+        if(n %% 10 == 0) {    print(n/n_targets)}
+        
     ## filter network by targets
     tmp_network <- network %>%
       filter(to == i)
@@ -167,7 +178,7 @@ makeDirected <- function(expression,network) {
     
     return(res)
     
-  },mc.cores = num_cores)
+  }) #,mc.cores = num_cores)
   
   network$correlation <-unlist(sapply(correlations, function(x) x$rho))
   
