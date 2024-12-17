@@ -7,13 +7,16 @@
 #' alignNetwork is a function for reading in, filtering, and otherwise processing GRNs downloaded from GRAND for use in GRACKLE.
 #' 
 #' @import dplyr
+#' @import tidyr
+#' @import tibble
 #' @param expression_file GTEX expression file, downloaded from GRAND. (For example, see https://grand.networkmedicine.org/tissues/Breast_tissue/)
 #' @param adjacency_file Network adjacency downloaded from GRAND. (For exampple, see https://grand.networkmedicine.org/tissues/Breast_tissue/)
 #' @param probability_threshold Number to threshold the filtering of the graph edge weights. (Default =1)
 #' @param tissue String of the tissue type for the GRN and expression data
+#' @param correlation_threshold Number representing the threshold for significant correlations for signing the network. (Default = .05)
 #' @export
 
-alignNetwork <- function(expression_file, adjacency_file, probability_threshold = 1, tissue){
+alignNetwork <- function(expression_file, adjacency_file, probability_threshold = 1, tissue, correlation_threshold = .05){
   
   filtered_expression_file <- paste0("./data/", tissue, "_filtered_expression_prob_",probability_threshold,".RData")
   filtered_network_file <- paste0("./data/", tissue, "_filtered_network_prob_", probability_threshold,".RData")
@@ -22,6 +25,7 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
     print("found filtered files")
     load(filtered_expression_file)
     load(filtered_network_file)
+
   } else {
     print("reading in expression and network files")            
     expression <- read.csv(expression_file)
@@ -69,7 +73,7 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
     filtered_network_long <- network_long %>%
       filter(from %in% names(filtered_expression) & to %in% names(filtered_expression))
     print("saving files")
-    save(filtered_breast_network_long, file = filtered_network_file)  
+    save(filtered_network_long, file = filtered_network_file)  
     save(filtered_expression, file = filtered_expression_file)
     print("done")
   } 
@@ -85,10 +89,9 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
    directed_network <- makeDirected(filtered_expression,filtered_network_long)
    save(directed_network, file = directed_network_file)
   }
-   
-   # 
-   # 
-   # directed_network <- directed_network %>% filter(abs(correlation) > .2)
+
+    directed_network <- directed_network %>% filter(abs(pvalue) > correlation_threshold)
+    
    # 
    # # some specific modifications for sgnesR. Expression simulator only takes 1 and -1 weights. 
    # directed_network$weight <- ifelse(directed_network$weight > 0,1,-1)
@@ -124,10 +127,14 @@ makeDirected <- function(expression,network) {
     arrange(to)
   ## identify the target genes
   targets <- unique(network$to)
-  
+
+   n_targets <- length(targets)
   ## find number of cores for parallelization
-  num_cores <- detectCores() - 1
-  correlations <- mclapply( targets, function(i) {
+  num_cores <- detectCores() - 4
+    correlations <- mclapply(targets, function(i) {
+
+        n <- which(targets == i)
+        if(n %% 10 == 0) {    print(n/n_targets)} 
     ## filter network by targets
     tmp_network <- network %>%
       filter(to == i)
