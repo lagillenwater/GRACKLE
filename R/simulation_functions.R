@@ -16,7 +16,7 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
     out_degrees <- degree(prior_graph,mode = "out")
     g_length <- 0
     
-    while(g_length < num_nodes) {
+    while(g_length > num_nodes) {
         g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
         sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
         E(g)$weight <- sm

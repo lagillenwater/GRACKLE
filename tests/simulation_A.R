@@ -9,7 +9,7 @@ library(ComplexHeatmap)
 library(parallel)
 load_all()
 
-load("./data/Breast/directed_breast_igraph.RData")
+load("./data/breast_igraph_prob_1_cor_0_05.RData")
 
 degrees <- degree(breast_g)
 

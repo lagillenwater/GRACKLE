@@ -90,13 +90,13 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
    save(directed_network, file = directed_network_file)
   }
 
-    igraph_file = paste0( "./data/", tissue,"_igraph_prob_", probability_threshold, "_cor",correlation_threshold,".RData")
+    igraph_file = paste0( "./data/", tissue,"_igraph_prob_", probability_threshold, "_cor_",gsub("[.]", "_", as.character(correlation_threshold)),".RData")
 
     if(file.exists(igraph_file)) {
         print("found igraph file")
     } else {
     
-        directed_network <- directed_network %>% filter(abs(pvalue) > correlation_threshold)
+        directed_network <- directed_network %>% filter(pvalue < correlation_threshold)
         print("filtering by correlation")
         
         ##   some specific modifications for sgnesR. Expression simulator only takes 1 and -1 weights. 
@@ -117,6 +117,7 @@ alignNetwork <- function(expression_file, adjacency_file, probability_threshold 
              print("saving igraph object")
     }
     print("done")
+    
 }
 
 
