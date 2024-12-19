@@ -11,25 +11,94 @@
 #' @export
 #' 
 randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
-    set.seed(42)
+   # set.seed(42)
     in_degrees <- degree(prior_graph,mode = "in")
     out_degrees <- degree(prior_graph,mode = "out")
     g_length <- 0
+    scale_factor <- 5
     
-    while(g_length > num_nodes) {
+    while(g_length <  num_nodes) {
         g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
         sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
         E(g)$weight <- sm
         
+        random_edges <- sample(E(g), num_nodes * scale_factor)
+        g <- subgraph.edges(g, eids = random_edges)
+        
         if(connected){  
-            components <- decompose(g)
-            
-            g <- components[[which.max(sapply(components, vcount))]]
+          components <- decompose(g)
+          
+          g <- components[[which.max(sapply(components, vcount))]]
         }
         g_length <- length(V(g))
+        scale_factor <- scale_factor + .1
+   #     (paste0(scale_factor, " : ", g_length))
     }
   print(g)
   return(g)
+}
+
+#' adjustTransitivity
+#' 
+#' @description adjustTransitivity iteratively rewires the graph to achieve the desired transitivity.
+#' @importFrom igraph degree.sequence.game rewire
+#' @param graph Igraph object 
+#' @param target_transitivity target_transitivity measure for the simulated graph. (Default is .5)
+#' @param max_iter the maximum number of iterations to try to achieve the target transitivity. 
+#' @return random graph with similar in and out degree
+#' @export
+#' 
+adjustTransitivity <- function(graph, target_transitivity = .5, max_iter = 1000) {
+  current_transitivity <- transitivity(graph, type = "global")
+
+  while(current_transitivity < target_transitivity) {
+    
+    # Randomly rewire edges to adjust transitivity
+    graph <- increaseTransitivity(graph)
+    
+    # Ensure the graph remains connected
+    # if (!is_connected(graph)) {
+    #   components <- clusters(graph)
+    #   for (i in 2:length(components$csize)) {
+    #     graph <- add_edges(graph, edges = c(sample(which(components$membership == 1),1), sample(which(components$membership == i),1)))
+    #   }
+    # }
+    current_transitivity <- transitivity(graph, type = "global")
+  }
+  
+  return(graph)
+}
+
+#' increaseTransitivity
+#' 
+#' @description Function for increasing the transitivity of the graph based on 
+#' @importFrom igraph neighbors add_edges
+#' @param graph Igraph object 
+#' @return random graph with similar in and out degree
+#' @export
+#' 
+increaseTransitivity <- function(graph) {
+  for (v in sample(V(graph),2)) {
+    neighbors_v <- neighbors(graph, v)
+    n_neighbors <- length(neighbors_v)
+    if(n_neighbors > 2) {
+      for (i in sample(1:(n_neighbors - 1),1)) {
+        for (j in sample((i + 1):n_neighbors,1)) {
+          if (!are_adjacent(graph, neighbors_v[i], neighbors_v[j])) {
+            result <- try(graph <- add_edges(graph, c(neighbors_v[i], neighbors_v[j])))
+            
+            if (inherits(result, "try-error")) {
+              # Skip the iteration if an error occurs
+              next
+            }
+            
+          
+          }
+        }
+      }
+    }
+  }
+  return(graph)
 }
 
 
@@ -66,6 +135,47 @@ modulePermutations <- function(g,membership, module_ids, increase_constant = 1.1
   return(g)
 }
 
+#' networkNoise
+#' 
+#' networkNoise is a function for increasing the noise of the graph 
+#'
+#' @importFrom igraph modularity cluster_louvain rewire
+#' @param graph igraph graph object
+#' @param goal_modularity The goal modularity to acheive in the permuted graph
+#' @param membership Vertex membership of igraph object
+#' @param large_clusters list of large_cluster ids
+#' @return permuted graph
+#' @export
+networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
+  
+  current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
+  
+  weights <- E(g)$weight 
+  
+  while(current_modularity > goal_modularity) {
+   
+    new_edge <- sample(V(graph), 2)
+    graph <- add_edges(graph, new_edge)
+    E(graph)[length(E(graph))]$weight  <- sample(weights,1)
+    
+    # for(i in large_clusters) {
+    #   # print(i)
+    #   community_nodes <- which(membership == i)
+    #   community_edges <- E(graph)[.inc(V(graph)[community_nodes])]
+    #   rand_edge <- sample(1:length(community_edges),1)
+    #   rand_nodes <- c(ends(graph, community_edges[rand_edge]))
+    #   community_edge <- get.edge.ids(graph, rand_nodes)
+    #   graph <- delete_edges(graph, community_edge)
+    #   
+    #   graph <- add_edges(graph,c(rand_nodes[1], sample(which(membership != i),1)))
+    #               
+    # 
+    # }
+    current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
+   #  print(current_modularity)
+  }
+  return(graph)
+}
 
 
 #' simualateExpression
