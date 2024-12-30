@@ -19,7 +19,7 @@ clinical_data <- GDCprepare(query)
 # Extract subtype information
 subtype_data <- clinical_data$clinical_patient_brca
 
-save(subtype_data, file = "./data/Breast/TCGA/Breast_subtype.RData")
+save(subtype_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_subtype.RData")
 # View the first few rows of the subtype data
 head(subtype_data)
 
@@ -35,16 +35,17 @@ GDCdownload(query)
 # Prepare the datap p
 gene_expression_data <- GDCprepare(query)
 
-save(gene_expression_data,file = "./data/Breast/TCGA/Breast_gene_expression.RData" )
+save(gene_expression_data,file = "../GRACKLE_data/data/Breast/TCGA/Breast_gene_expression.RData" )
 
 # View the metadata
 colData(gene_expression_data)
 
 metadata <- colData(gene_expression_data)
-save(metadata, file = "./data/Breast/TCGA/Breast_metadata.RData")
+save(metadata, file = "../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
 # View the gene expression data
 expression_data <- assay(gene_expression_data, "tpm_unstrand")
 
+load("../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
 library(tidyverse)
 
@@ -63,10 +64,9 @@ expression_data <- expression_data %>%
 
 
 
-load("./data/Breast/directed_breast_network.RData")  
+load("../GRACKLE_data/data/Breast/directed_breast_network.RData")  
 
-expression_data <- expression_data %>%
-  filter(rownames(.) %in% union(directed_breast_network$from,directed_breast_network$to))
+
 
 
 ## filter by variance
@@ -76,7 +76,7 @@ length(tokeep)
 expression_data <- expression_data %>%
   filter(rownames(.) %in% names(tokeep))
 
-save(expression_data, file = "./data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
+
 
 directed_breast_network <- directed_breast_network %>%
   filter(from %in% rownames(expression_data) & to %in% rownames(expression_data))
@@ -84,7 +84,14 @@ directed_breast_network <- directed_breast_network %>%
 library(igraph)
 
 directed_breast_g_with_PAM50 <- graph_from_data_frame(directed_breast_network %>% dplyr::select(from,to,weight), directed = TRUE)
-save(directed_breast_g_with_PAM50, file = "./data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
+save(directed_breast_g_with_PAM50, file = "../GRACKLE_data/data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
+
+expression_data <- expression_data %>%
+  filter(rownames(.) %in% union(directed_breast_network$from,directed_breast_network$to))
+
+
+save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
+
 
 ## filtering out PAM50 genes
 pam50 <- read.delim("./data/Breast/TCGA/pam50_annotation.txt")
