@@ -13,7 +13,7 @@
 #' @export
 split_data <- function(expression,metadata,  training_size = .7) {
 
-
+    set.seed(NULL)
     train_index <- sample(seq_len(nrow(metadata)), size = training_size * nrow(metadata))
 
     train_expression <- expression[train_index, ]
