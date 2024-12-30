@@ -19,7 +19,8 @@ Imports:
 	ppcor,
 	FNN,
 	NMF,
-	RColorBrewer
+	RColorBrewer,
+	tidyr
 LinkingTo:
 	Rcpp
 Roxygen: list(markdown = TRUE)

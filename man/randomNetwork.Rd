@@ -4,12 +4,14 @@
 \alias{randomNetwork}
 \title{randomNetwork}
 \usage{
-randomNetwork(prior_graph, connected = TRUE)
+randomNetwork(prior_graph, connected = TRUE, num_nodes = 400)
 }
 \arguments{
 \item{prior_graph}{Igraph object of the directed, weighted prior network to model  the simulated network on.}
 
 \item{connected}{Boolean to determine if the random graph should be directed or not. (Default is TRUE)}
+
+\item{num_nodes}{Numerical vector representing the size of the graph (Default is 400)}
 }
 \value{
 random graph with similar in and out degree

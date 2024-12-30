@@ -4,7 +4,7 @@
 \alias{split_data}
 \title{split_data}
 \usage{
-split_data(expression, metadata, seed = 42, training_size = 0.7)
+split_data(expression, metadata, training_size = 0.7)
 }
 \arguments{
 \item{expression}{Data.frame of simulated gene expression data}
