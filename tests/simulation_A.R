@@ -22,15 +22,16 @@ degrees <- degree(breast_g)
 ## qplot(y  = seq_along(degrees), x= degrees, geom = "point", ylab = "" ) + theme_classic()
 ## dev.off()
 
-num_nodes = 300
+num_nodes = 500
 ### noise test
-noise_sequence <- c(seq(.7,.8,.1))
+noise_sequence <- c(seq(.3,.7,.1))
 
-## t_sequence <- c(0,seq(.1,.3,.1))
-## nn_sequence <- c(0,seq(.7,.5,-.1))
+t_sequence <- c(0,seq(.1,.3,.1))
+nn_sequence <- c(0,seq(.8,.6,-.1))
 
-t_sequence <- 0
-nn_sequence <- 0
+#noise_sequence <- .3
+## t_sequence <- 0
+## nn_sequence <- 0
 
 num_groups = 5
 num_per_group = 20
@@ -103,7 +104,7 @@ if(file.exists(rand_graph_file)) {
 
 ## clusters_to_highlight <- lapply(large_clusters, function(x) clusters[[x]])
 # Plot the graph with module overlay
-#pdf("./results/networks/network_modules.pdf")
+#pdf("./results/networks/network_odules.pdf")
 
 ## g_title = paste("M:", round(modularity(clusters), 4))
 
@@ -179,7 +180,7 @@ for(x in t_sequence) {
 
     }
 
-    network_t = round(transitivity(as_undirected(new_g), weights = NA),4)
+    network_t = transitivity(as_undirected(new_g), weights = NA)
     print(paste("network transivity: ", network_t))
     
     ## generate list of permuted networks with distinctly permuted modules
@@ -235,8 +236,10 @@ for(x in t_sequence) {
             new_g <- networkNoise(g,goal_modularity = y, membership = membership,large_clusters = large_clusters)
         } 
 
+        cat("\n")
         print(paste0("runing simulation for transitivity: ", x, " and modularity: ", y))
-        
+
+        cat("\n")
         network_noise <- round(modularity(cluster_louvain(as.undirected(new_g), weights = NA)), 4)
         print(paste("network modularity: ", network_noise))
         
@@ -245,13 +248,15 @@ for(x in t_sequence) {
 
         results <- list()
         
-         for(ns in 1:length(noise_sequence)) {
+        for(ns in 1:length(noise_sequence)) {
+            cat("\n")
             print(paste("noise_sequence", noise_sequence[ns]))
             res <- list()
 
-            iterations <- 20
+            iterations <- 100
             
             for(d in 1:iterations) {
+                
                 print(paste("iteration", d, "out of", iterations))
                 dat <- split_data(noisy_expression[[ns]], metadata , training_size = .7)
 
@@ -277,6 +282,7 @@ for(x in t_sequence) {
                 cl <- makeCluster(detectCores() -1)
                 clusterEvalQ(cl, .libPaths("/home/lucas/R/x86_64-pc-linux-gnu-library/4.1"))
                 clusterEvalQ(cl,{
+
                     library(devtools)
                     load_all()
                 })
@@ -310,10 +316,10 @@ for(x in t_sequence) {
 
                 stopCluster(cl)
 
-                grid_search$scores <- unlist(scores)
+                grid_search$score <- unlist(scores)
 
-                print(paste("avg GRACKLE score", round(mean(grid_search$scores),3)))
-#                print(grid_search %>% filter(scores == max(grid_search$scores)))
+                print(paste("avg GRACKLE score", round(mean(grid_search$score),3)))
+                print(paste("top GRACKLE score", max(grid_search %>% filter(scores == max(grid_search$score)) %>% .$score)))
                 
 
                 nmf <- runNMF(dat$train_expression,num_groups, "lee", seed = 42)
@@ -327,7 +333,7 @@ for(x in t_sequence) {
                 print(paste("NMF score", nmf_res))
 
                 
-                grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = num_groups, seed = 42, max_iter = 300, alpha = .1)
+                grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = num_groups, seed = 42, max_ = 300, alpha = .1)
                 grnmf_res <- evaluationWrapper(test_expression = dat$test_expression,
                                                test_metadata = dat$test_metadata,
                                                H_train = grnmf$H,
@@ -338,7 +344,9 @@ for(x in t_sequence) {
                 print(paste("GRNMF score", grnmf_res))
 
 
-                res[[d]] <- list(grid_search = grid_search,nmf_res = nmf_res, grnmf_res = grnmf_res)
+                res[[d]] <- list(grid_search = grid_search,nmf_res = nmf_res, grnmf_res = grnmf_res, transitivity = network_t, modularity = network_noise, expression_noise = noise_sequence[ns])
+
+                cat("\n")
                 
             }
 
@@ -348,7 +356,9 @@ for(x in t_sequence) {
 
 
         noise_simulation_results_file <- paste0("../GRACKLE_results/small_simulation_A/simulation_results_num_nodes_", num_nodes,"_num_groups_", num_groups,"_num_samples_", num_per_group,"_t_", x, "_m_", y, ".RData")
+        print(paste("saving", noise_simulation_results_file))
         save(results, file = noise_simulation_results_file)
+        cat("\n")
 
         
     }
