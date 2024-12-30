@@ -34,7 +34,7 @@ GRACKLE <- function(
     verbose = FALSE,
     beta = 0) {
   
-
+    set.seed(42)
     ## calc degree
     D_p <- diag(rowSums(patient_similarity))
     D_g <- diag(rowSums(net_similarity)) 
