@@ -21,7 +21,7 @@ project_W <- function(test_data,H_train,k) {
   
   ## convert test_data to a matrix
   #    test_data <- as.matrix(test_data)
-  test_data <- apply(test_data,2,scale)
+  #test_data <- apply(test_data,2,scale)
   
   ## Solve for W_test using NNLS
   for (i in 1:nrow(test_data)) {
