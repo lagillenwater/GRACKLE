@@ -1,5 +1,5 @@
 ## set seed
-## set.seed(42)
+
                                         #
 ## setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
 suppressMessages({
@@ -30,19 +30,20 @@ nn_sequence <- c(0,seq(.8,.6,-.1))
 ## nn_sequence <- 0
 
 num_groups = 5
-num_per_group = 10
+num_per_group = 20
 
 rand_graph_file = paste0("../GRACKLE_results/small_simulation_A/random_graph_", num_nodes, "nodes.RData")
 
-if(file.exists(rand_graph_file)) {
-    print("loading random graph")
-    load(rand_graph_file)
-} else {
+## loading file bug: 12/30/24
+## if(file.exists(rand_graph_file)) {
+##     print("loading random graph")
+##     load(rand_graph_file)
+## } else {
 
                                         # generate random breast_g# generate random nework 
     g <- randomNetwork(prior_graph = breast_g, num_nodes = num_nodes)
     save(g,file = rand_graph_file)
-}
+## }
 
 
 for(x in t_sequence) {
@@ -74,7 +75,7 @@ for(x in t_sequence) {
 
 
 ##    if(!file.exists(noisy_expression_file)) {
-
+    set.seed(42)
         print("creating noisy expression")
         noisy_expression <- mclapply(noise_sequence, function(z){
 
@@ -126,14 +127,16 @@ for(x in t_sequence) {
             print(paste("noise_sequence", noise_sequence[ns]))
             res <- list()
 
-            iterations <- 10
+            iterations <- 100
             
             for(d in 1:iterations) {
                 cat("\n")
-                print(paste0("running simulation for transitivity: ", network_t, " and modularity: ", network_noise))
+                print(paste0("running simulation for transitivity: ", network_t, " and modularity: ", network_noise, " at expression noise:", noise_sequence[ns]))
                 
                 print(paste("iteration", d, "out of", iterations))
+
                 dat <- split_data(noisy_expression[[ns]], metadata , training_size = .7)
+##                print(head(rownames(dat$train_expression)))
 
                 
                 pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
@@ -174,12 +177,12 @@ for(x in t_sequence) {
                         Y = dat$train_expression,
                         net_similarity = as.matrix(g_adjacency),
                         patient_similarity = pat_sim,
-                        diff_threshold = 1e-6,
+                        diff_threshold = 1e-5,
                         lambda_1 = grid_search$lambda_1[i],
                         lambda_2 =  grid_search$lambda_2[i],
                         k = num_groups,
                         verbose = F,
-                        beta = .0)
+                        beta = 0)
 
 
                     ## correspondence between selected W LV's and top loading gene modules
