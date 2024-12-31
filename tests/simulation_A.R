@@ -10,6 +10,7 @@ suppressMessages({
   #      library(ggplot2)
  #       library(ComplexHeatmap)
         library(parallel)
+        library(foreach)
         load_all()
     })
 })
@@ -18,14 +19,13 @@ breast_g <- get(load("../GRACKLE_data/data/breast_igraph_prob_1_cor_0_05.RData")
 
 degrees <- degree(breast_g)
 
-num_nodes = 300
+num_nodes = 400
 ### noise test
 noise_sequence <- c(seq(.3,.7,.1))
-
 t_sequence <- c(0,seq(.1,.3,.1))
 nn_sequence <- c(0,seq(.8,.6,-.1))
 
-#noise_sequence <- .3
+## noise_sequence <- .3
 ## t_sequence <- 0
 ## nn_sequence <- 0
 
@@ -41,8 +41,8 @@ rand_graph_file = paste0("../GRACKLE_results/small_simulation_A/random_graph_", 
 ## } else {
 
                                         # generate random breast_g# generate random nework 
-    g <- randomNetwork(prior_graph = breast_g, num_nodes = num_nodes)
-    save(g,file = rand_graph_file)
+g <- randomNetwork(prior_graph = breast_g, num_nodes = num_nodes)
+save(g,file = rand_graph_file)
 ## }
 
 
@@ -158,16 +158,16 @@ for(x in t_sequence) {
                 names(grid_search) <- c("lambda_1", "lambda_2")
                 grid_search$score <- 0
 
-                cl <- makeCluster(detectCores() -1)
-                clusterEvalQ(cl, .libPaths("/home/lucas/R/x86_64-pc-linux-gnu-library/4.1"))
-                clusterEvalQ(cl,{
+                ## cl <- makeCluster(detectCores() -1)
+                ## clusterEvalQ(cl, .libPaths("/home/lucas/R/x86_64-pc-linux-gnu-library/4.1"))
+                ## clusterEvalQ(cl,{
 
-                    library(devtools)
-                    load_all()
-                })
-                clusterExport(cl, varlist = c("pat_sim", "g_adjacency", "dat", "num_groups", "grid_search", "large_clusters", "clusters"))       
+                ##     library(devtools)
+                ##     load_all()
+                ## })
+                ## clusterExport(cl, varlist = c("pat_sim", "g_adjacency", "dat", "num_groups", "grid_search", "large_clusters", "clusters"))       
                 
-                scores <- parLapply(cl,1:nrow(grid_search), function(i) {
+                scores <- mclapply(1:nrow(grid_search), function(i) {
                 ## scores <- list()
                 ## for( i in 1: nrow(grid_search)) {
                 ##     ## run GRACKLE NMF
@@ -193,9 +193,10 @@ for(x in t_sequence) {
                                                clusters = clusters,
                                                aligned_clusters = large_clusters)
 ##                    scores[[i]] <- score
-                })
 
-                stopCluster(cl)
+                }, mc.cores = 6)
+
+##                stopCluster(cl)
 
                 grid_search$score <- unlist(scores)
 
@@ -226,6 +227,7 @@ for(x in t_sequence) {
 
 
                 res[[d]] <- list(grid_search = grid_search,nmf_res = nmf_res, grnmf_res = grnmf_res, transitivity = network_t, modularity = network_noise, expression_noise = noise_sequence[ns])
+
 
                 cat("\n")
                 
