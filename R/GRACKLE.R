@@ -77,43 +77,27 @@ GRACKLE <- function(
     while((H_diff > diff_threshold) | (W_diff >diff_threshold)) {
         oldW <- W
         oldH <- H
-        
-        ## Iteratively update matrices
-        
-      
-
+                ## Iteratively update matrices
         W <- W *  ((Y %*% t(H) + lambda_1 * patient_similarity %*% W  )   / (W%*% H %*% t(H) + lambda_1 * D_p %*% W ) )
         W <- apply(W,2,function(x) scale(x,center = F))
-        
         H <-H *  ((t(W) %*% Y + H %*% net_similarity * lambda_2) / (t(W) %*% W %*% H + H%*% D_g * lambda_2 ) )
         H <- t(apply(H,1,function(x) scale(x,center = F)))
-       
-       
         reconstruction_error <- sum((Y-W%*%H)^2)
         pat_sim_error <- lambda_1 * sum(diag(t(W) %*% L_p %*%W))
         grn_error <-lambda_2 * sum(diag(H  %*% L_g %*% t(H)))
-
         if(verbose) {
             message("reconstruction error=", round(reconstruction_error,2), " | patient similarity error=", round(pat_sim_error,2), " | grn error=", round(grn_error,2))
         }
-        
         reconstruction_error_vec <- c(reconstruction_error_vec, reconstruction_error)
         pat_sim_error_vec <- c(pat_sim_error_vec, pat_sim_error)
         grn_error_vec <- c(grn_error_vec, grn_error)
-        
-                                      
-        
         W_diff <- round(sum((W - oldW)^2)/sum(W^2),7)
       #  print(W_diff)
         W_diff_vec <-c(W_diff_vec, W_diff)
-
         H_diff <- round(sum((H - oldH)^2)/sum(H^2),7)
        # print(H_diff)
         H_diff_vec <-c(H_diff_vec, H_diff)
-        
-        
- #       if(reconstruction_error > (1.25 * reconstruction_error_vec[length(reconstruction_error_vec) - 1])) {break}
-        
+         #       if(reconstruction_error > (1.25 * reconstruction_error_vec[length(reconstruction_error_vec) - 1])) {break}
     }
     
     colnames(W) <- paste0("LV",1:k)
