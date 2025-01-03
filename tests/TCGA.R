@@ -3,55 +3,65 @@
 BiocManager::install("TCGAbiolinks")
 library(TCGAbiolinks)
 
-# Query for clinical data
-query <- GDCquery(project = "TCGA-BRCA", 
-                  data.category = "Clinical", 
-                  data.type = "Clinical Supplement", 
-                  data.format = "BCR Biotab")
+## # Query for clinical data
+## query <- GDCquery(project = "TCGA-BRCA", 
+##                   data.category = "Clinical", 
+##                   data.type = "Clinical Supplement", 
+##                   data.format = "BCR Biotab")
 
-# Download the data
-GDCdownload(query)
+## # Download the data
+## GDCdownload(query)
 
-# Prepare the data
-clinical_data <- GDCprepare(query)
-
-
-# Extract subtype information
-subtype_data <- clinical_data$clinical_patient_brca
-
-save(subtype_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_subtype.RData")
-# View the first few rows of the subtype data
-head(subtype_data)
+## # Prepare the data
+## clinical_data <- GDCprepare(query)
 
 
-query <- GDCquery(project = "TCGA-BRCA", 
-                  data.category = "Transcriptome Profiling", 
-                  data.type = "Gene Expression Quantification", 
-                  workflow.type = "STAR - Counts")
+## # Extract subtype information
+## subtype_data <- clinical_data$clinical_patient_brca
 
-# Download the data
-GDCdownload(query)
+## save(subtype_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_subtype.RData")
 
-# Prepare the datap p
-gene_expression_data <- GDCprepare(query)
+## # View the first few rows of the subtype data
+## head(subtype_data)
 
-save(gene_expression_data,file = "../GRACKLE_data/data/Breast/TCGA/Breast_gene_expression.RData" )
 
+## query <- GDCquery(project = "TCGA-BRCA", 
+##                   data.category = "Transcriptome Profiling", 
+##                   data.type = "Gene Expression Quantification", 
+##                   workflow.type = "STAR - Counts")
+
+## # Download the data
+## GDCdownload(query)
+
+## # Prepare the datap p
+## gene_expression_data <- GDCprepare(query)
+
+## save(gene_expression_data,file = "../GRACKLE_data/data/Breast/TCGA/Breast_gene_expression.RData" )
+
+
+
+load( file = "../GRACKLE_data/data/Breast/TCGA/Breast_subtype.RData")
+load(file = "../GRACKLE_data/data/Breast/TCGA/Breast_gene_expression.RData")
 # View the metadata
-colData(gene_expression_data)
+library(SummarizedExperiment)
+##colData(gene_expression_data)
+
 
 metadata <- colData(gene_expression_data)
 save(metadata, file = "../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
 # View the gene expression data
 expression_data <- assay(gene_expression_data, "tpm_unstrand")
 
-load("../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
+
 
 library(tidyverse)
 
 expression_data <- expression_data %>%
   as.data.frame() %>%
   mutate(ensembl_ids = gsub("\\..*", "", rownames(.)))
+
+library(devtools)
+load_all()
 
 hgnc_map <- ensemblToHGNC(expression_data$ensembl_ids)
 
@@ -94,14 +104,14 @@ save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_g
 
 
 ## filtering out PAM50 genes
-pam50 <- read.delim("./data/Breast/TCGA/pam50_annotation.txt")
-directed_breast_network_without_PAM50 <- directed_breast_network %>%
-  filter(!(from %in% pam50$GeneName | to %in% pam50$GeneName))
+## pam50 <- read.delim("./data/Breast/TCGA/pam50_annotation.txt")
+## directed_breast_network_without_PAM50 <- directed_breast_network %>%
+##   filter(!(from %in% pam50$GeneName | to %in% pam50$GeneName))
 
-directed_breast_g_without_PAM50 <- graph_from_data_frame(directed_breast_network_without_PAM50 %>% dplyr::select(from,to,weight), directed = TRUE)
-save(directed_breast_g_without_PAM50, file = "./data/Breast/TCGA/directed_breast_g_without_PAM50.RData")
+## directed_breast_g_without_PAM50 <- graph_from_data_frame(directed_breast_network_without_PAM50 %>% dplyr::select(from,to,weight), directed = TRUE)
+## save(directed_breast_g_without_PAM50, file = "./data/Breast/TCGA/directed_breast_g_without_PAM50.RData")
 
-expression_data_without_PAM50 <- expression_data %>%
-  filter(!(rownames(.) %in% pam50$GeneName))
-save(expression_data_without_PAM50, file = "./data/Breast/TCGA/Breast_filtered_gene_expression_without_PAM50.RData")         
+## expression_data_without_PAM50 <- expression_data %>%
+##   filter(!(rownames(.) %in% pam50$GeneName))
+## save(expression_data_without_PAM50, file = "./data/Breast/TCGA/Breast_filtered_gene_expression_without_PAM50.RData")         
 
