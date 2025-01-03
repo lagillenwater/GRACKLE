@@ -127,6 +127,6 @@ for ( x in 1:100) {
       return(list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res))
 }
       
-      save(results, file = "../GRACKLE_results/TCGA_BRCA/TCGA_breast_with_PAM50_results.RData")
+      save(results, file = "TCGA_breast_with_PAM50_results.RData")
     
     
