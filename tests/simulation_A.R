@@ -10,7 +10,6 @@ suppressMessages({
   #      library(ggplot2)
  #       library(ComplexHeatmap)
         library(parallel)
-        library(foreach)
         load_all()
     })
 })
@@ -194,7 +193,7 @@ for(x in t_sequence) {
                                                aligned_clusters = large_clusters)
 ##                    scores[[i]] <- score
 
-                }, mc.cores = 6)
+                }, mc.cores = 4)
 
 ##                stopCluster(cl)
 
