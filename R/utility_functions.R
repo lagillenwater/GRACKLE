@@ -8,11 +8,12 @@
 #' @param data A data frame of numeric values
 #' @param min_vals A numeric vector of minimum values for each column
 #' @param max_vals A numeric vector of maximum values for each column
+#' @param axis A numeric value representing the axis to scale (1 = rows, 2 = columns) (Default = 2)
 #' @return scaled min max data frame
 #' @export
-min_max_scale <- function(data, min_vals, max_vals) {
-  scaled_data <- sweep(data, 2, min_vals, "-")
-  scaled_data <- sweep(scaled_data, 2, max_vals - min_vals, "/")
+min_max_scale <- function(data, min_vals, max_vals, axis = 2) {
+  scaled_data <- sweep(data, axis, min_vals, "-")
+  scaled_data <- sweep(scaled_data, axis, max_vals - min_vals, "/")
 return(scaled_data)
 }
 
