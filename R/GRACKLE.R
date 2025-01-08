@@ -5,6 +5,7 @@
 #'  Function for running Graph Regularization Across Contextual KnowLedgE
 #'
 #' @importFrom Matrix Matrix
+#' @import gpuR
 #' @param Y Input gene expression data
 #' @param net_similarity Similarity matrix based on GRN
 #' @param patient_similarity Similarity matrix based on patient metadata
@@ -37,20 +38,29 @@ GRACKLE <- function(
     beta = 0,
     error_terms = FALSE) {
 
+    Y <- Matrix(Y, sparse = T)
     
-    
-    set.seed(42)
+
     ## calc degree
     D_p <- diag(rowSums(patient_similarity))
-    D_g <- diag(rowSums(net_similarity)) 
+    D_g <- diag(rowSums(net_similarity))
+
+    D_p <- Matrix(D_p, sparse = T)
+    D_g <- Matrix(D_g, sparse = T)
+    
     ## calc graph laplacian
     L_p <- D_p - patient_similarity
     L_g <- D_g - net_similarity
+
+    L_p <- Matrix(L_p, sparse = T)
+    L_g <- Matrix(L_g, sparse = T)
+    
     ## Initialize matrices
     n <- nrow(Y)
     m <- ncol(Y)
-    W <- matrix(runif(n * k, min = 0, max = 1), nrow = n, ncol = k)
-    H <- matrix(runif(k * m, min = 0, max = 1), nrow = k, ncol = m)
+    set.seed(42)
+    W <- Matrix(runif(n * k, min = 0, max = 1), nrow = n, ncol = k, sparse = T)
+    H <- Matrix(runif(k * m, min = 0, max = 1), nrow = k, ncol = m, sparse = T)
     H_diff_vec <- numeric()
     W_diff_vec <- numeric()
     
@@ -78,13 +88,14 @@ GRACKLE <- function(
         oldH <- H
         ## Iteratively update matrices
         W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W  )   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W)
-        ## W <- apply(W,2,function(x) scale(x,center = F))
-        W <- min_max_scale(W, min_vals = min(W), max_vals = max(W))
-        W <- Matrix(W,sparse = T)
+        ##W <- apply(W,2,function(x) scale(x,center = F))
+        ##     W <- min_max_scale(W, min_vals = min(W), max_vals = max(W))
+        ## W <- Matrix(W,sparse = T)
+
         H <-H *  ((crossprod(W ,Y) + H %*% net_similarity * lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
-        H <- t(min_max_scale(t(as.matrix(H)), min_vals = min(H), max_vals = max(H)))
-        ## ## H <- t(apply(H,1,function(x) scale(x,center = F)))
-        H <- Matrix(H, sparse = T)
+        ## H <- t(min_max_scale(t(as.matrix(H)), min_vals = min(H), max_vals = max(H)))
+        ## H <- t(apply(H,1,function(x) scale(x,center = F)))
+        ## H <- Matrix(H, sparse = T)
         if(error_terms) {
             reconstruction_error <- sum((Y-W%*%H)^2)
             pat_sim_error <- lambda_1 * sum(diag(t(W) %*% L_p %*%W))

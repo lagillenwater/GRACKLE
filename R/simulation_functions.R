@@ -14,28 +14,43 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
    # set.seed(42)
     in_degrees <- degree(prior_graph,mode = "in")
     out_degrees <- degree(prior_graph,mode = "out")
-    g_length <- 0
-    scale_factor <- 5
-    
-    while(g_length <  num_nodes) {
-        g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
-        sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
-        E(g)$weight <- sm
+    g_diff <- 100
+    scale_factor <- 1
+    g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
+    sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
+    E(g)$weight <- sm
         
-        random_edges <- sample(E(g), num_nodes * scale_factor)
-        g <- subgraph.edges(g, eids = random_edges)
+    while(abs(g_diff) > 1) {
+        
+        ## random_edges <- sample(E(g), num_nodes * scale_factor)
+        ## g_subgraph <- subgraph.edges(g, eids = random_edges)
+
+        random_nodes<- sample(V(g), num_nodes * scale_factor)
+        g_subgraph <- induced_subgraph(g, vids = random_nodes)
+        
+        print(length(V(g_subgraph)))
         
         if(connected){  
-          components <- decompose(g)
-          
-          g <- components[[which.max(sapply(components, vcount))]]
+          components <- decompose(g_subgraph)
+                  g_subgraph <- components[[which.max(sapply(components, vcount))]]
         }
-        g_length <- length(V(g))
-        scale_factor <- scale_factor + .1
-   #     (paste0(scale_factor, " : ", g_length))
+
+        g_length <- length(V(g_subgraph))
+        
+
+        g_diff <- g_length - num_nodes
+        ## print(g_diff)
+        
+        if(g_diff < 0) {
+            scale_factor <- scale_factor + .1
+        } else {
+            scale_factor <- scale_factor - .1
+        }
+
+        ## print(scale_factor)
+        
     }
-  print(g)
-  return(g)
+  return(g_subgraph)
 }
 
 #' adjustTransitivity
@@ -266,7 +281,7 @@ parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, 
   num_cores <- detectCores() - 1
   res <- mclapply(1:num_samples, function(x) {
     simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
-  })
+  }, mc.cores = num_cores)
   
   exp <- do.call(cbind,res)
 

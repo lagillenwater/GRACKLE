@@ -6,14 +6,14 @@
 #'
 #' @param expression Data.frame of simulated gene expression data
 #' @param metadata Data.frame of patient metadata
+#' @param seed starting seed for random sampling
 #' @return train_expression Data.frame of training expression data
 #' @return test_expression Data.frame of testing expression data
 #' @return train_metadata Data.frame of training metadata
 #' @return test_metadata Data.frame of testing metadata
 #' @export
-split_data <- function(expression,metadata,  training_size = .7) {
-
-    set.seed(NULL)
+split_data <- function(expression,metadata,  training_size = .7, seed = 42) {
+    set.seed(seed)
     train_index <- sample(seq_len(nrow(metadata)), size = training_size * nrow(metadata))
 
     train_expression <- expression[train_index, ]
