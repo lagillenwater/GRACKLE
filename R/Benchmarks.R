@@ -54,12 +54,16 @@ runGRNMF <- function(expression_matrix, k = 5,  seed = 42, max_iter = 200, alpha
   # Initialize W and H matrices
     W <- matrix(runif(nrow(expression_matrix) * k), nrow = nrow(expression_matrix), ncol = k)
     H <- matrix(runif(k * ncol(expression_matrix)), nrow = k, ncol = ncol(expression_matrix))
-
+  
   
   # GNMF update function
   for (i in 1:max_iter) {
-      H <- H * (t(W) %*% expression_matrix) / (t(W) %*% W %*% H + alpha * H %*% W_graph)
+      
       W <- W * (expression_matrix %*% t(H)) / (W %*% H %*% t(H))
+      W <- apply(W,2,function(x) scale(x,center = F))      
+      H <- H * (t(W) %*% expression_matrix) / (t(W) %*% W %*% H + alpha * H %*% W_graph)
+       H <- t(apply(H,1,function(x) scale(x,center = F))) 
+
   }
   
     # Extract the basis and coefficient matrices

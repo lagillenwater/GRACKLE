@@ -168,7 +168,9 @@ networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
   weights <- E(g)$weight 
   
   while(current_modularity > goal_modularity) {
-   
+
+      old_edge <- sample(E(graph),1)
+      graph <- delete_edges(graph, old_edge)
     new_edge <- sample(V(graph), 2)
     graph <- add_edges(graph, new_edge)
     E(graph)[length(E(graph))]$weight  <- sample(weights,1)
@@ -210,7 +212,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
   
   res <- lapply(1:iterations, function(x) {
     # Specifying global reaction parameters.
-    time <- sample(600:800,1)
+    time <- sample(400:600,1)
     rp<-new("rsgns.param",time=0,stop_time=time,readout_interval= time)
     
     # Specifying the reaction rate constant vector for following reactions: (1) Translation rate, (2) RNA degradation rate, (3) Protein degradation rate, (4) Protein binding rate, (5) unbinding rate, (6) transcription rate.
@@ -278,10 +280,9 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
 #' @return data frame of simulated gene expression data
 #' @export
 parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = .3) {
-  num_cores <- detectCores() - 1
   res <- mclapply(1:num_samples, function(x) {
     simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
-  }, mc.cores = num_cores)
+  }, mc.cores = 2)
   
   exp <- do.call(cbind,res)
 

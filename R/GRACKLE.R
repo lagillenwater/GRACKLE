@@ -5,7 +5,7 @@
 #'  Function for running Graph Regularization Across Contextual KnowLedgE
 #'
 #' @importFrom Matrix Matrix
-#' @import gpuR
+#' @import tensorflow
 #' @param Y Input gene expression data
 #' @param net_similarity Similarity matrix based on GRN
 #' @param patient_similarity Similarity matrix based on patient metadata
@@ -16,6 +16,7 @@
 #' @param verbose A boolean value as to whether to print loss error or not. Default is FALSE. 
 #' @param beta A numeric value representing the degree of l2 regularization. Default is 0.
 #' @param error_terms A boolean to determine whether or not to calculate error terms. Default is False
+#' @param iterations Number of iterations
 #' @return A list containing the following components:
 #' \item{residual}{A matrix representing the residuals, calculated as \code{Y - W \%*\% H}.}
 #' \item{H}{The matrix \code{H} obtained from the NMF calculation.}
@@ -36,31 +37,39 @@ GRACKLE <- function(
     k = 5, 
     verbose = FALSE,
     beta = 0,
-    error_terms = FALSE) {
+    error_terms = FALSE,
+    iterations = 100) {
 
-    Y <- Matrix(Y, sparse = T)
+
+    scale_without_centering <- function(x) {
+        std_dev <- tf$math$reduce_std(x)
+        tf$math$divide(x, std_dev)
+    }
+
+
+##    Y <- Matrix(Y, sparse = T)
     
 
     ## calc degree
     D_p <- diag(rowSums(patient_similarity))
     D_g <- diag(rowSums(net_similarity))
 
-    D_p <- Matrix(D_p, sparse = T)
-    D_g <- Matrix(D_g, sparse = T)
+    ## D_p <- Matrix(D_p, sparse = T)
+    ## D_g <- Matrix(D_g, sparse = T)
     
     ## calc graph laplacian
     L_p <- D_p - patient_similarity
     L_g <- D_g - net_similarity
 
-    L_p <- Matrix(L_p, sparse = T)
-    L_g <- Matrix(L_g, sparse = T)
+    ## L_p <- Matrix(L_p, sparse = T)
+    ## L_g <- Matrix(L_g, sparse = T)
     
     ## Initialize matrices
     n <- nrow(Y)
     m <- ncol(Y)
     set.seed(42)
-    W <- Matrix(runif(n * k, min = 0, max = 1), nrow = n, ncol = k, sparse = T)
-    H <- Matrix(runif(k * m, min = 0, max = 1), nrow = k, ncol = m, sparse = T)
+    W <- matrix(runif(n * k, min = 0, max = 1), nrow = n, ncol = k)
+    H <- matrix(runif(k * m, min = 0, max = 1), nrow = k, ncol = m)
     H_diff_vec <- numeric()
     W_diff_vec <- numeric()
     
@@ -84,18 +93,88 @@ GRACKLE <- function(
     }
     
     H_diff <- 1
-    while(H_diff > diff_threshold) {
-        oldH <- H
-        ## Iteratively update matrices
-        W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W  )   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W)
-        ##W <- apply(W,2,function(x) scale(x,center = F))
-        ##     W <- min_max_scale(W, min_vals = min(W), max_vals = max(W))
-        ## W <- Matrix(W,sparse = T)
 
-        H <-H *  ((crossprod(W ,Y) + H %*% net_similarity * lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
-        ## H <- t(min_max_scale(t(as.matrix(H)), min_vals = min(H), max_vals = max(H)))
-        ## H <- t(apply(H,1,function(x) scale(x,center = F)))
-        ## H <- Matrix(H, sparse = T)
+    # Ensure TensorFlow uses the GPU
+    Sys.setenv(TF_ENABLE_ONEDNN_OPTS = "0")
+                                        # Set TensorFlow logging level to suppress INFO and WARNING messages
+    Sys.setenv(TF_CPP_MIN_LOG_LEVEL = "3")
+
+    physical_devices <- tf$config$list_physical_devices('GPU')
+                                        # Set TensorFlow logging level to ERROR
+    
+    
+    if (length(physical_devices) > 0) {
+        suppressMessages({
+            suppressWarnings({
+                tf$config$experimental$set_memory_growth(physical_devices[[1]], TRUE)
+                tf$config$set_visible_devices(physical_devices[[1]], 'GPU')
+            })
+        })
+    
+    } else {
+        print("No GPU found. Using CPU.")
+    }
+    
+    Y_tf <- tf$convert_to_tensor(Y, dtype = tf$float64)
+    patient_similarity_tf <- tf$convert_to_tensor(patient_similarity, dtype = tf$float64)
+    net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float64)
+    D_p_tf <- tf$convert_to_tensor(D_p, dtype = tf$float64)
+    D_g_tf <- tf$convert_to_tensor(D_g, dtype = tf$float64)
+    W_tf <- tf$convert_to_tensor(W, dtype = tf$float64)
+    H_tf <- tf$convert_to_tensor(H, dtype = tf$float64)
+        ## print(dim(W_tf))
+        ## print(dim(H_tf))
+        ## print(dim(W))
+        ## print(dim(H))
+
+##    for(i in 1:iterations){
+
+
+        ## print(identical(W, as.matrix(W_tf)))
+        ## print(head(W))
+        ## print(head(as.matrix(W_tf)))
+        
+     while(H_diff > diff_threshold) {
+         oldH_tf <- H_tf
+        ## Iteratively update matrices
+        ## W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W  )   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W)
+
+        ## W <- apply(W,2,function(x) scale(x,center = F))
+
+        ## H <-H *  ((crossprod(W ,Y) + H %*% net_similarity * lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
+        ## H <- t(apply(H,1,function(x) scale(x,center = F))) 
+
+# Numerator and Denominator for W update
+        numerator_W <- tf$add(tf$matmul(Y_tf, H_tf, transpose_b = TRUE), lambda_1 * tf$matmul(patient_similarity_tf, W_tf))
+        denominator_W <- tf$add(tf$matmul(W_tf, tf$matmul(H_tf, H_tf, transpose_b = TRUE)), lambda_1 * tf$matmul(D_p_tf, W_tf))
+        W_tf <- tf$multiply(W_tf, tf$divide(numerator_W, denominator_W))
+
+
+        W_tf <- tf$map_fn(scale_without_centering, W_tf, dtype = tf$float64)
+        
+
+        ## test1 <- tcrossprod(Y,H)
+        ## test2 <- tf$matmul(Y_tf, H_tf, transpose_b = TRUE)
+
+        ## ## print(test1)
+        ## ## print(test2)
+        ## print(cor(test1[,1], as.matrix(test2[,1])))
+
+        
+        numerator_H <- tf$add(tf$matmul(W_tf, Y_tf, transpose_a = TRUE), tf$matmul(H_tf, net_similarity_tf) * lambda_2)
+        denominator_H <- tf$add(tf$matmul(tf$matmul(W_tf, W_tf, transpose_a = TRUE), H_tf), tf$matmul(H_tf, D_g_tf) * lambda_2)
+        H_tf <- tf$multiply(H_tf, tf$divide(numerator_H, denominator_H))
+
+                                        # Transpose the matrix to apply the function to rows
+        H_tf_transposed <- tf$transpose(H_tf)
+
+                                        # Apply the scaling function to each row (which are now columns after transpose)
+        H_tf_scaled_transposed <- tf$map_fn(scale_without_centering, H_tf_transposed, dtype = tf$float64)
+
+                                        # Transpose back to the original orientation
+        H_tf_scaled <- tf$transpose(H_tf_scaled_transposed)
+
+       
         if(error_terms) {
             reconstruction_error <- sum((Y-W%*%H)^2)
             pat_sim_error <- lambda_1 * sum(diag(t(W) %*% L_p %*%W))
@@ -107,11 +186,25 @@ GRACKLE <- function(
         if(verbose) {
             message("reconstruction error=", round(reconstruction_error,2), " | patient similarity error=", round(pat_sim_error,2), " | grn error=", round(grn_error,2))
         }
-        H_diff <- sum((H - oldH)^2) / sum(H^2)
+         ## H_diff <- sum((H - oldH)^2) / sum(H^2)
+         # Calculate the difference
+         diff <- tf$subtract(H_tf, oldH_tf)
+
+# Calculate the numerator: sum((H - oldH)^2)
+         numerator <- tf$reduce_sum(tf$square(diff))
+
+# Calculate the denominator: sum(H^2)
+         denominator <- tf$reduce_sum(tf$square(H_tf))
+
+# Calculate _diff
+         H_diff <- tf$math$divide(numerator, denominator)
+         H_diff <- as.numeric(H_diff)
     }
     
-    
-            
+    W <- as.matrix(W_tf)
+    H <- as.matrix(H_tf)
+
+
     colnames(W) <- paste0("LV",1:k)
     rownames(H) <- paste0("LV",1:k)
     
