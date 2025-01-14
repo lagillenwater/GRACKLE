@@ -18,8 +18,7 @@ runNMF <- function(expression_matrix,k = 5, method = 'lee', seed = 42) {
  
   
   # Run NMF with parallel computing
-    res <- nmf(expression_matrix
-             u, rank, nrun = 4)
+  res <- nmf(expression_matrix, rank = k, seed = seed)
   
     
     W <- basis(res)
@@ -46,7 +45,7 @@ runGRNMF <- function(expression_matrix, k = 5,  seed = 42, max_iter = 200, alpha
   set.seed(seed)
   # Create an affinity graph using k-nearest neighbors
   knn_graph <- get.knn(t(expression_matrix), k = k)$nn.index
-  W_graph <- matrix(0, nrow = ncol(expression_matrix), ncol = ncol(expression_matrix))
+  net_similarity <- matrix(0, nrow = ncol(expression_matrix), ncol = ncol(expression_matrix))
   for (i in 1:nrow(knn_graph)) {
     W_graph[i, knn_graph[i, ]] <- 1
     W_graph[knn_graph[i, ], i] <- 1
@@ -55,12 +54,16 @@ runGRNMF <- function(expression_matrix, k = 5,  seed = 42, max_iter = 200, alpha
   # Initialize W and H matrices
     W <- matrix(runif(nrow(expression_matrix) * k), nrow = nrow(expression_matrix), ncol = k)
     H <- matrix(runif(k * ncol(expression_matrix)), nrow = k, ncol = ncol(expression_matrix))
-
+  
   
   # GNMF update function
   for (i in 1:max_iter) {
-      H <- H * (t(W) %*% expression_matrix) / (t(W) %*% W %*% H + alpha * H %*% W_graph)
+      
       W <- W * (expression_matrix %*% t(H)) / (W %*% H %*% t(H))
+      W <- apply(W,2,function(x) scale(x,center = F))      
+      H <- H * (t(W) %*% expression_matrix) / (t(W) %*% W %*% H + alpha * H %*% W_graph)
+       H <- t(apply(H,1,function(x) scale(x,center = F))) 
+
   }
   
     # Extract the basis and coefficient matrices

@@ -17,11 +17,11 @@ suppressMessages({
 
                                         # Define the list of options
 option_list <- list(
-    make_option(c("-n", "--num_nodes"), type = "numeric", default = 0, help = "Number of nodes int he graph", metavar = "NUMBER"),
-    make_option(c("-i", "--iterations"), type = "numeric", default = 0, help = "Iterations to run", metavar = "NUMBER"),
-    make_option(c("-g", "--num_per_group"), type = "numeric", default = 0, help = "Number of samples per group", metavar = "NUMBER"),
-    make_option(c("-k", "--num_groups"), type = "numeric", default = 0, help = "Number of groups", metavar = "NUMBER"),
-    make_option(c("-c", "--num_cores"), type = "numeric", default = 0, help = "Number of cores", metavar = "NUMBER")
+    make_option(c("-n", "--num_nodes"), type = "numeric",  help = "Number of nodes int he graph", metavar = "NUMBER"),
+    make_option(c("-i", "--iterations"), type = "numeric", help = "Iterations to run", metavar = "NUMBER"),
+    make_option(c("-g", "--num_per_group"), type = "numeric",  help = "Number of samples per group", metavar = "NUMBER"),
+    make_option(c("-k", "--num_groups"), type = "numeric",  help = "Number of groups", metavar = "NUMBER"),
+    make_option(c("-c", "--num_cores"), type = "numeric",  help = "Number of cores", metavar = "NUMBER")
     
     
 )
@@ -35,17 +35,19 @@ breast_g <- get(load("../GRACKLE_data/data/breast_igraph_prob_1_cor_0_05.RData")
 degrees <- degree(breast_g)
 
 num_nodes = opt$num_nodes
-### noise test
-## noise_sequence <- c(seq(.3,.7,.1))
-## t_sequence <- c(0,seq(.1,.3,.1))
-## nn_sequence <- c(0,seq(.8,.6,-.1))
 
-noise_sequence <- .3
+### noise test
+ noise_sequence <- c(seq(.1,.5, .2))
+## t_sequence <- c(0,seq(.1,.3,.1))
+ 
+
+##noise_sequence <- .1
 t_sequence <- 0
-nn_sequence <- 0
+##nn_sequence <- 0
 
 num_groups = opt$num_groups
 num_per_group = opt$num_per_group
+
 
 rand_graph_file = paste0("../GRACKLE_results/small_simulation_A/random_graph_", num_nodes, "nodes.RData")
 
@@ -83,6 +85,9 @@ for(x in t_sequence) {
     print(membership_counts)
     large_clusters <- names(membership_counts[order(membership_counts, decreasing = T)][1:5])
 
+    
+
+   
     cat("\n")
     network_noise <- round(modularity(clusters), 4)
     print(paste("prior network modularity: ", network_noise))
@@ -99,7 +104,7 @@ for(x in t_sequence) {
         print("creating noisy expression")
         noisy_expression <- lapply(noise_sequence, function(z){
             ## simulate gene expression for the permuted networks
-            sim_exp <- mclapply(large_clusters, function(x) {parallelSimulateExpression(g, iterations = 3, max_expression = 100,num_samples = num_per_group,select_nodes = which(membership == x),perturbation_constant = 2.8,noise_constant = z)}, mc.cores = 5)
+            sim_exp <- mclapply(large_clusters, function(x) {parallelSimulateExpression(g, iterations = 2, max_expression = 100,num_samples = num_per_group,select_nodes = which(membership == x),perturbation_constant = 2.8,noise_constant = z)}, mc.cores = 8)
                     ## combine expression data
             sim_exp <- lapply(sim_exp, as.data.frame)
             combined_exp <- do.call(rbind, sim_exp)
@@ -108,14 +113,17 @@ for(x in t_sequence) {
         })
 
         names(noisy_expression) <- noise_sequence
-        print("saving noisy expression")
+        print(dim(noisy_expression[[1]]))
+        print(nrow(noisy_expression[[1]]))
         metadata <- simulateMetadata(group_size = rep(num_per_group,num_groups), group_labels = paste0("subgroup", 1:num_groups), row_names = paste0("sample", 1:nrow(noisy_expression[[1]])))
+        print("saving noisy expression")
         save(noisy_expression, metadata, file = noisy_expression_file)
 
     }
-
+    mod =     round(modularity(cluster_louvain(as.undirected(new_g), weights = NA)), 1)
+    nn_sequence <- seq(mod,mod - .2,-.1)
     for(y in nn_sequence) {
-
+        
         if(y !=0) {
             print("adding network noise")
             new_g <- networkNoise(g,goal_modularity = y, membership = membership,large_clusters = large_clusters)
@@ -148,6 +156,8 @@ for(x in t_sequence) {
 ##                print(head(rownames(dat$train_expression)))
 
                 print(head(rownames(dat$train_expression)))
+
+                
                 
                 pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
 
@@ -160,8 +170,8 @@ for(x in t_sequence) {
                 dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
 
 
-                i_seq <-seq(0,1,.1)
-                j_seq <-seq(0,1,.1)
+                i_seq <-seq(0,1,.2)
+                j_seq <-seq(0,1,.2)
 
                 print("GRACKLE grid search ...") 
                 grid_search <- as.data.frame(expand.grid(i_seq,j_seq))
@@ -182,45 +192,53 @@ for(x in t_sequence) {
                 ## scores <- list()
                 ## for( i in 1: nrow(grid_search)) {
                 ##     ## run GRACKLE NMF
-                ##     print(round(i/nrow(grid_search),3))
+                    ##     print(round(i/nrow(grid_search),3))
                     grackle <- GRACKLE(
                         Y = dat$train_expression,
                         net_similarity = as.matrix(g_adjacency),
                         patient_similarity = pat_sim,
-                        diff_threshold = 1e-4,
+                        diff_threshold = 1e-5,
                         lambda_1 = grid_search$lambda_1[i],
                         lambda_2 =  grid_search$lambda_2[i],
                         k = num_groups,
                         verbose = F,
-                        error_terms = FALSE,
+                        error_terms = F,
                         beta = 0)
+
+                    
+                    
+
                     ## correspondence between selected W LV's and top loading gene modules
                     score <- evaluationWrapper(test_expression = dat$test_expression,
                                                test_metadata = dat$test_metadata,
-                                               H_train = as.matrix(grackle$H),
+                                               H_train = grackle$H,
                                                k = num_groups,
                                                clusters = clusters,
                                                aligned_clusters = large_clusters)
-##                    scores[[i]] <- score
+
+
+                    ##                    scores[[i]] <- score
                 }, mc.cores = opt$num_cores)
 
 ##                stopCluster(cl)
 
                 grid_search$score <- unlist(scores)
 
+               
+
                 print(paste("avg GRACKLE score", round(mean(grid_search$score),3)))
                 print(paste("top GRACKLE score", max(grid_search %>% filter(scores == max(grid_search$score)) %>% .$score)))
                 
 
-                nmf <- runNMF(dat$train_expression,num_groups, "lee", seed = 42)
-                nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
-                                             test_metadata = dat$test_metadata,
-                                             H_train = nmf$H,
-                                             k = num_groups,
-                                             clusters = clusters,
-                                             aligned_clusters = large_clusters)
-
-                print(paste("NMF score", nmf_res))
+                ## nmf <- runNMF(dat$train_expression,num_groups, "lee", seed = 42)
+                ## nmf_res <- evaluationWrapper(test_expression = dat$test_expression,
+                ##                              test_metadata = dat$test_metadata,
+                ##                              H_train = nmf$H,
+                ##                              k = num_groups,
+                ##                              clusters = clusters,
+                ##                              aligned_clusters = large_clusters)
+                nmf_res <- grid_search$score[1]
+                Print(paste("NMF score", nmf_res))
 
                 
                 grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = num_groups, seed = 42, max_ = 300, alpha = 1)
@@ -235,6 +253,8 @@ for(x in t_sequence) {
 
 
                 res[[d]] <- list(grid_search = grid_search,nmf_res = nmf_res, grnmf_res = grnmf_res, transitivity = network_t, modularity = network_noise, expression_noise = noise_sequence[ns])
+                ## res[[d]] <- list(grid_search = grid_search, transitivity = network_t, modularity = network_noise, expression_noise = noise_sequence[ns])
+
 
 
                 cat("\n")

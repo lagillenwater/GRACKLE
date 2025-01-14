@@ -108,7 +108,6 @@ geneLoadingsEvaluation <- function(H_train, clusters, aligned_clusters ) {
     module_scores <- lapply(aligned_clusters, function(i) {
         rowSums(H_train[,clusters[[i]]])
     })
-    
    
     module_scores <- lapply(module_scores, function(x) {
       names(x) <- paste0("LV", 1:n_lvs)
@@ -199,9 +198,11 @@ evaluationWrapper <- function(test_expression,  test_metadata,H_train,k,clusters
   
   ## evaluate gene loadings
   top_loadings <- geneLoadingsEvaluation(H_train, clusters = clusters, aligned_clusters = aligned_clusters)
-  #   
+
+    
+                                        #   
   ## correspondence between selected W LV's and top loading gene modules
-  score <- mean(unlist(lapply(1:5, function(x) {
+  score <- mean(unlist(lapply(1:k, function(x) {
     if(!(is.na(top_sample_LVs$top[x][[1]])) | is.na(top_loadings$top[x][[1]])) {
       if(identical(top_sample_LVs$top[x][[1]], top_loadings$top[x][[1]])) { 1} else {0}
     } })))

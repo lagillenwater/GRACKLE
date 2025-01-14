@@ -79,7 +79,7 @@ load("../GRACKLE_data/data/Breast/directed_breast_network.RData")
 
 
 
-## filter by variance
+## filter by 
 variance <- apply(expression_data,1,var)
 tokeep <- variance[order(variance, decreasing = T)][1:2000]
 length(tokeep)

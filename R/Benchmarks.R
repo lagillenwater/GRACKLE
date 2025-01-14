@@ -18,7 +18,7 @@ runNMF <- function(expression_matrix,k = 5, method = 'lee', seed = 42) {
  
   
   # Run NMF with parallel computing
-  res <- nmf(expression_matrix, rank = k, seed = seed)
+  res <- NMF::nmf(expression_matrix, rank = k, seed = seed)
   
     
     W <- basis(res)

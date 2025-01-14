@@ -30,9 +30,9 @@ normalize <- function(matrix) {
 }
 
 
-#'  entrezToHGNC
+#'  ensemblToHGNC
 #' 
-#'  entrezToHGNC is a function for converting entrez ID's to HGNC ID's
+#'  ensemblToHGNC is a function for converting entrez ID's to HGNC ID's
 #'
 #' @importFrom utils download.file
 #' @importFrom dplyr filter arrange select %>%
@@ -58,3 +58,34 @@ ensemblToHGNC <- function(ensembl_ids) {
     
   return(hgnc_ids)
 }
+
+
+#'  entrezToHGNC
+#' 
+#'  entrezToHGNC is a function for converting entrez ID's to HGNC ID's
+#'
+#' @importFrom utils download.file
+#' @importFrom dplyr filter arrange select %>%
+#' @param entrez_ids  Character vector of entrez ID's to convert to HGNC gene ID's
+#' @return hgnc_ids   Character vector of HGNC ID's
+#' @export
+entrezToHGNC <- function(entrez_ids) {
+  hgnc_url <-  "https://storage.googleapis.com/public-download-files/hgnc/archive/archive/monthly/tsv/hgnc_complete_set_2024-10-01.txt"
+  destfile <- tempfile()  # Create a temporary file
+  
+  # Download the file
+  download.file(hgnc_url, destfile)
+  
+  # Read the file into a dataframe
+  hgnc_df <- read.csv(destfile, header = TRUE, sep = "\t")  
+  
+  # filter and return ID's
+  hgnc_ids <- hgnc_df %>%
+    filter(entrez_id %in% entrez_ids ) %>%
+    arrange(match(entrez_id,entrez_ids)) %>%
+    select(symbol,entrez_id)
+    
+  return(hgnc_ids)
+}
+
+
