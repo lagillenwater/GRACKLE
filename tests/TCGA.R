@@ -55,7 +55,6 @@ expression_data <- assay(gene_expression_data, "tpm_unstrand")
 
 
 library(tidyverse)
-
 expression_data <- expression_data %>%
   as.data.frame() %>%
   mutate(ensembl_ids = gsub("\\..*", "", rownames(.)))
@@ -77,11 +76,9 @@ expression_data <- expression_data %>%
 load("../GRACKLE_data/data/Breast/directed_breast_network.RData")  
 
 
-
-
 ## filter by 
 variance <- apply(expression_data,1,var)
-tokeep <- variance[order(variance, decreasing = T)][1:2000]
+tokeep <- variance[order(variance, decreasing = T)][1:5000]
 length(tokeep)
 expression_data <- expression_data %>%
   filter(rownames(.) %in% names(tokeep))
@@ -104,7 +101,7 @@ save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_g
 
 
 ## filtering out PAM50 genes
-## pam50 <- read.delim("./data/Breast/TCGA/pam50_annotation.txt")
+pam50 <- read.delim("./data/Breast/TCGA/pam50_annotation.txt")
 ## directed_breast_network_without_PAM50 <- directed_breast_network %>%
 ##   filter(!(from %in% pam50$GeneName | to %in% pam50$GeneName))
 

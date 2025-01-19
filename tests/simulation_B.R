@@ -59,9 +59,6 @@ for(i in 1:num_groups) {
 
         sim_exp[start:end, membership == gene_clusters[i]] <-     matrix(nrow =num_per_group ,ncol = sum(membership == gene_clusters[i]),runif(num_per_group*sum(membership == gene_clusters[i]), min =5 , max = 20))
 
-
-
-
 }
 
 dist_matrix <- dist(sim_exp)
