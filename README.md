@@ -15,7 +15,7 @@ flexibility allows application to various data modalities, offering a robust sol
 specific molecular mechanisms in biomedical research.
 
 
-<img src="https://github.com/user-attachments/assets/ae8be5ae-fc1f-4d48-912a-3277ff14d97d" width="675" height="300">
+<img src="https://github.com/user-attachments/assets/ae8be5ae-fc1f-4d48-912a-3277ff14d97d" width="450" height="200">
 
 # Download
 Download code and data to run analysis via:
