@@ -13,3 +13,12 @@ subgroups in individuals with Down syndrome. The model's latent representations 
 biological patterns, such as autoimmune conditions and sleep apnea in Down syndrome. GRACKLE's
 flexibility allows application to various data modalities, offering a robust solution for identifying context-
 specific molecular mechanisms in biomedical research.
+
+
+<img src="https://github.com/user-attachments/assets/ae8be5ae-fc1f-4d48-912a-3277ff14d97d" width="675" height="300">
+
+# Download
+Download code and data to run analysis via:
+```
+git clone https://github.com/lagillenwater/GRACKLE
+```
