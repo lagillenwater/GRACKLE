@@ -8,9 +8,56 @@ library(ggplot2)
 library(ComplexHeatmap)
 load_all()
 
-load( "./results/simulation_A/data/NMF_model_results.RData")
 
-noise_sequence <- seq(0,.8,.1)
+result_files <- list.files(path= "../GRACKLE_results/small_simulation_A/", pattern= "simulation_results_num_nodes_400_num_groups_5", full.names = T)
+
+
+results_list <- lapply(result_files, function(x) get(load(x)))
+
+full_results <- lapply(results_list, function(x) {
+  
+  tmp <- lapply(x, function(y){
+    grid_searches <- lapply(y, function(z) z$grid_search)
+    avg_grackle <- lapply(grid_searches, function(z) mean(z$score))
+    top_grackle <- lapply(grid_searches, function(z) {
+      z %>%
+        filter(score == max(score)) %>%
+        distinct(score)
+    })
+    nmf_results <- lapply(y, function(z) z$nmf_res)
+    grnmf_results <- lapply(y, function(z) z$grnmf_res)
+    netnmf_results <-  lapply(grid_searches, function(z) {
+      z %>%
+        filter(lambda_1 ==0 & lambda_2 ==1) %>%
+        .$score
+    })
+    modularity <- lapply(y, function(z) z$modularity)
+    transitivity <- lapply(y, function(z) z$transitivity)
+    expression_noise <- lapply(y, function(z) z$expression_noise)
+    
+    return(data.frame(avg_grackle = unlist(avg_grackle), 
+             top_grackle = unlist(top_grackle),
+             nmf_results = unlist(nmf_results),
+             grnmf_results= unlist(grnmf_results),
+             netnmf_results = unlist(netnmf_results),
+             modularity = unlist(modularity),
+             transitivity = unlist(transitivity),
+             expression_noise=unlist(expression_noise)))
+  })
+  bind_rows(tmp)
+  
+})
+
+full_results <- bind_rows(full_results)
+
+full_results <- full_results %>%
+  filter(expression_noise %in% c(.3,.5,.7))
+
+
+ggplot()
+
+
+
 
 merged_grid_search_scores <- lapply(noise_simulation_results, function(x){
   grid_searches <- lapply(x, function(y) x[[1]]$grid_search)
@@ -21,6 +68,7 @@ merged_grid_search_scores <- lapply(noise_simulation_results, function(x){
     select(lambda_1, lambda_2, avg_score)
                                  
 })
+
 
 names(merged_grid_search_scores) <- noise_sequence
 

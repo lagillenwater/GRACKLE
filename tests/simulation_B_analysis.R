@@ -8,7 +8,7 @@ library(ggplot2)
 library(ComplexHeatmap)
 load_all()
 
-results_files <- list.files("../GRACKLE_results/small_simulation_B/", full.names = TRUE)
+results_files <- list.files("../GRACKLE_results/small_simulation_A/",pattern= "simulation_results_num_nodes_400_num_groups_5", full.names = TRUE)
 
 results <- lapply(results_files, function(x) get(load(x)))
 
