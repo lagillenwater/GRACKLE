@@ -81,12 +81,13 @@ for ( x in 1:50) {
         
         z = 100
         ## correspondence between selected W LV's and top loading gene modules
-        while(any(is.na(grackle$H))) {
+        while(any(is.na(grackle$H)|any(is.infinite(grackle$H)))|(max(grackle$H) - min(grackle$H)) >1e21) {
             z = z-5
             print(z)
         grackle <- GRACKLE(
-            Y = dat$train_expression,
-            net_similarity = as.matrix(breast_g_adjacency),
+            Y = htp_expression,
+            net_similarity = as.matrix(breast
+                                       _g_adjacency),
             patient_similarity = pat_sim,
             diff_threshold = 1e-4,
             lambda_1 = grid_search$lambda_1[i],

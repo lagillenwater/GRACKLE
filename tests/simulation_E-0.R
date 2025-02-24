@@ -19,6 +19,9 @@ suppressMessages({
     })
 })
 
+
+
+
                                         # Define the list of options
 option_list <- list(
     make_option(c("-n", "--num_nodes"), type = "numeric",  help = "Number of nodes int he graph", metavar = "NUMBER"),

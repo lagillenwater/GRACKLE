@@ -106,7 +106,7 @@ geneLoadingsEvaluation <- function(H_train, clusters, aligned_clusters ) {
   
     ## calculate the module scores
     module_scores <- lapply(aligned_clusters, function(i) {
-        rowSums(H_train[,clusters[[i]]])
+        rowMeans(H_train[,clusters[[i]]])
     })
    
     module_scores <- lapply(module_scores, function(x) {
@@ -135,6 +135,7 @@ geneLoadingsEvaluation <- function(H_train, clusters, aligned_clusters ) {
 #' @return top A list of the module score. 
 #' @export
 
+
 sampleLoadingsEvaluation <- function(W_test, test_metadata) {
   # name LV's
   ## name LV's
@@ -143,7 +144,8 @@ sampleLoadingsEvaluation <- function(W_test, test_metadata) {
   
   test_metadata <- as.data.frame(test_metadata)
   
-  subgroups <- names(test_metadata)
+    subgroups <- names(test_metadata)
+    ##print(subgroups)
   
     ## calculate the module scores
   subgroup_scores <- lapply(subgroups, function(i) {
@@ -156,7 +158,7 @@ sampleLoadingsEvaluation <- function(W_test, test_metadata) {
     } else if(num_samples ==1) {
       W_test[subgroup_samples,]
     } else {
-      colSums(W_test[rownames(W_test) %in% subgroup_samples,])
+      colMeans(W_test[rownames(W_test) %in% subgroup_samples,])
     }
   })
   
@@ -195,15 +197,17 @@ evaluationWrapper <- function(test_expression,  test_metadata,H_train,k,clusters
   
   ## evaluate sample loadings
   top_sample_LVs <- sampleLoadingsEvaluation(W_test, test_metadata)
-  
+
+    ## print(top_sample_LVs)
+    
   ## evaluate gene loadings
   top_loadings <- geneLoadingsEvaluation(H_train, clusters = clusters, aligned_clusters = aligned_clusters)
-
-    
+    ##print(top_loadings)
                                         #   
   ## correspondence between selected W LV's and top loading gene modules
-  score <- mean(unlist(lapply(1:k, function(x) {
-    if(!(is.na(top_sample_LVs$top[x][[1]])) | is.na(top_loadings$top[x][[1]])) {
+    score <- mean(unlist(lapply(1:k, function(x) {
+        ##print(x)
+      if(!(is.na(top_sample_LVs$top[x][[1]])) | is.na(top_loadings$top[x][[1]])) {
       if(identical(top_sample_LVs$top[x][[1]], top_loadings$top[x][[1]])) { 1} else {0}
     } })))
   

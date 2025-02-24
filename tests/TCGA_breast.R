@@ -47,7 +47,7 @@ for ( x in 1:50) {
   
     print(paste("itertion",x))
 
-  dat <- split_data(expression, breast_subtype_metadata , training_size = .7, seed = x)
+   dat <- split_data(expression, breast_subtype_metadata , training_size = .7, seed = x)
   pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
   min_vals <- apply(dat$train_expression,2, min) + 1e-10
   max_vals <- apply(dat$train_expression,2, max) 

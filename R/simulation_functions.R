@@ -11,7 +11,8 @@
 #' @export
 #' 
 randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
-   # set.seed(42)
+
+     set.seed(42)
     in_degrees <- degree(prior_graph,mode = "in")
     out_degrees <- degree(prior_graph,mode = "out")
     g_diff <- 100
@@ -21,35 +22,26 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
     E(g)$weight <- sm
         
     while(abs(g_diff) > 1) {
-        
         ## random_edges <- sample(E(g), num_nodes * scale_factor)
         ## g_subgraph <- subgraph.edges(g, eids = random_edges)
-
         random_nodes<- sample(V(g), num_nodes * scale_factor)
         g_subgraph <- induced_subgraph(g, vids = random_nodes)
-        
-        print(length(V(g_subgraph)))
-        
         if(connected){  
           components <- decompose(g_subgraph)
-                  g_subgraph <- components[[which.max(sapply(components, vcount))]]
+          g_subgraph <- components[[which.max(sapply(components, vcount))]]
         }
-
         g_length <- length(V(g_subgraph))
-        
-
         g_diff <- g_length - num_nodes
         ## print(g_diff)
-        
         if(g_diff < 0) {
-            scale_factor <- scale_factor + .1
+            scale_factor <- scale_factor + .01
         } else {
-            scale_factor <- scale_factor - .1
+            scale_factor <- scale_factor - .001
         }
-
+  ##      print(g_diff)
         ## print(scale_factor)
-        
     }
+    
   return(g_subgraph)
 }
 
@@ -166,30 +158,22 @@ networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
   current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
   
   weights <- E(g)$weight 
-  
-  while(current_modularity > goal_modularity) {
+  mod_diff <- current_modularity - goal_modularity
+  while(abs(mod_diff ) > .01) {
 
-      old_edge <- sample(E(graph),1)
+      if(mod_diff >0) {
+            
+          new_edge <- sample(V(graph), 2)
+          graph <- add_edges(graph, new_edge)
+          E(graph)[length(E(graph))]$weight  <- sample(weights,1)
+      } else {
+          old_edge <- sample(E(graph),1)
       graph <- delete_edges(graph, old_edge)
-    new_edge <- sample(V(graph), 2)
-    graph <- add_edges(graph, new_edge)
-    E(graph)[length(E(graph))]$weight  <- sample(weights,1)
-    
-    # for(i in large_clusters) {
-    #   # print(i)
-    #   community_nodes <- which(membership == i)
-    #   community_edges <- E(graph)[.inc(V(graph)[community_nodes])]
-    #   rand_edge <- sample(1:length(community_edges),1)
-    #   rand_nodes <- c(ends(graph, community_edges[rand_edge]))
-    #   community_edge <- get.edge.ids(graph, rand_nodes)
-    #   graph <- delete_edges(graph, community_edge)
-    #   
-    #   graph <- add_edges(graph,c(rand_nodes[1], sample(which(membership != i),1)))
-    #               
-    # 
-    # }
-    current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
-   #  print(current_modularity)
+      }
+
+      current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
+      mod_diff <- current_modularity - goal_modularity
+  print(mod_diff)
   }
   return(graph)
 }
@@ -228,8 +212,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
     V(g)$Rpop <- sample(max_expression, n_nodes, rep=TRUE)
     
     if(!is.null(select_nodes)){
-      
-      
+            
       # select_degrees <- degree(g, v = select_nodes)
       # high_degree_nodes <- select_nodes[select_degrees > 2]
       # # <- sample(high_degree_nodes,1,replace = F)
@@ -282,7 +265,7 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
 parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = .3) {
   res <- mclapply(1:num_samples, function(x) {
     simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
-  }, mc.cores = 2)
+  }, mc.cores = 8)
   
   exp <- do.call(cbind,res)
 
