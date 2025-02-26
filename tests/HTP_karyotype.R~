@@ -81,24 +81,19 @@ htp_expression <-as.matrix( min_max_scale(htp_expression,min_vals,max_vals))
 ##   ## min-max scale the input matrix
 ## T21.mixed$metabolites <-as.matrix( min_max_scale(T21.mixed$metabolites,min_vals,max_vals))
 patient_similarity <- tcrossprod(as.matrix(metadata))
-
 net_similarity <- as.matrix(blood_g_adjacency)
 
 
 
 
 ### extracting specific resutls
-## k = 6
-## l_1 = 100, l_2 = 2
 k=4
-
 Y = htp_expression
 net_similarity = net_similarity
 patient_similarity = patient_similarity
 diff_threshold = 1e-5
 lambda_1 = 100
 lambda_2 =20
-k = k
 verbose = F
 beta = 0
 error_terms = F
