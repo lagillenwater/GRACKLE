@@ -56,44 +56,46 @@ GRACKLE <- function(
       print("No GPU found. Using CPU.")
     }
 
-    
-    ## scale_without_centering <- function(x) {
-    ##     return((x - min(x)) / (max(x) - min(x)))
-    ## }
+    ## Enable mixed precision
+    policy <- tf$keras$mixed_precision$Policy('mixed_float16')
+    tf$keras$mixed_precision$set_global_policy(policy)
 
     ## calc degree
-    D_p <- diag(rowSums(patient_similarity))
-    D_g <- diag(rowSums(net_similarity)) + diag(colSums(net_similarity))
-    ## calc graph laplacian
-    L_p <- D_p - patient_similarity
-    L_g <- D_g - net_similarity
-
+    ##D_p <- diag(rowSums(patient_similarity)) + diag(colSums(patient_similarity))
+    ##D_g <- diag(rowSums(net_similarity)) + diag(colSums(net_similarity))
+    
     
     ## Initialize matrices
+    ## random
     n <- nrow(Y)
     m <- ncol(Y)
     set.seed(42)
     W <- matrix(runif(n * k, min = min(Y), max = max(Y) ), nrow = n, ncol = k)
     set.seed(42)
     H <- matrix(runif(k * m, min = min(Y), max = max(Y)), nrow = k, ncol = m)
-    H_diff_vec <- numeric()
-    W_diff_vec <- numeric()
-    Y_tf <- tf$convert_to_tensor(Y, dtype = tf$float64)
-    patient_similarity_tf <- tf$convert_to_tensor(patient_similarity, dtype = tf$float64)
-    net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float64)
-    D_p_tf <- tf$convert_to_tensor(D_p, dtype = tf$float64)
-    D_g_tf <- tf$convert_to_tensor(D_g, dtype = tf$float64)
-    L_p_tf <- tf$convert_to_tensor(L_p, dtype = tf$float64)
-    L_g_tf <- tf$convert_to_tensor(L_g, dtype = tf$float64)
-    W_tf <- tf$convert_to_tensor(W, dtype = tf$float64)
-    H_tf <- tf$convert_to_tensor(H, dtype = tf$float64)
 
+    ## Perform SVD
+    ## svd_result <- svd(Y)
+    ## ## Initialize W and H matrices using SVD
+    ## W <- abs(svd_result$u[,1:k] %*% diag(svd_result$d[1:k]))
+    ## H <- t(abs(svd_result$v[,1:k]))
+
+    Y_tf <- tf$convert_to_tensor(Y, dtype = tf$float16)
+    patient_similarity_tf <- tf$convert_to_tensor(patient_similarity, dtype = tf$float16)
+    net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float16)
+    W_tf <- tf$convert_to_tensor(W, dtype = tf$float16)
+    H_tf <- tf$convert_to_tensor(H, dtype = tf$float16)
+    D_p_tf <- tf$linalg$diag(tf$reduce_sum(patient_similarity_tf, axis = as.integer(0)))
+    D_g_tf <- tf$linalg$diag(tf$reduce_sum(net_similarity_tf, axis = as.integer(0)))
+    
     ## normalize the Laplacians
     ## Calculate the inverse square root of D_p
-    D_p_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_p))^-1)
-    L_p_norm <- tf$matmul(tf$matmul(D_p_inv_sqrt, L_p), D_p_inv_sqrt)
-    D_g_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_g))^-1)
-    L_g_norm <- tf$matmul(tf$matmul(D_g_inv_sqrt, L_g), D_g_inv_sqrt)
+    ## L_p_norm <- tf$matmul(tf$matmul(D_p_inv_sqrt, L_p), D_p_inv_sqrt)
+    ## L_g_norm <- tf$matmul(tf$matmul(D_g_inv_sqrt, L_g), D_g_inv_sqrt)
+
+    ## Normalize the degree matrix
+    ## D_p_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_p))^-1)
+    ## D_g_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_g))^-1)
     
 ##   for(i in 1:iterations) {
 ##        print(i)
@@ -108,8 +110,8 @@ GRACKLE <- function(
       ## H <-H *  ((crossprod(W ,Y) +  H %*% net_similarity*lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
       ## H <- t(apply(H,1,function(x) scale(x,center = F)))
       ## tensor  #######
-      print(colSums(as.matrix(W_tf)))
-      print(rowSums(as.matrix(H_tf)))
+      ##      print(colSums(as.matrix(W_tf)))
+      ## print(rowSums(as.matrix(H_tf)))
       ## Numerator and Denominator for W update
       numerator_W <- tf$add(tf$matmul(Y_tf, H_tf, transpose_b = TRUE), lambda_1 * tf$matmul(patient_similarity_tf, W_tf))
       denominator_W <- tf$add(tf$matmul(W_tf, tf$matmul(H_tf, H_tf, transpose_b = TRUE)), lambda_1 * tf$matmul(D_p_tf, W_tf))
@@ -129,7 +131,8 @@ GRACKLE <- function(
       ## Calculate _diff
       H_diff <- tf$math$divide(numerator, denominator)
       H_diff <- as.numeric(H_diff)
-  }
+#      print(H_diff)
+    }
     
     W <- as.matrix(W_tf)
     H <- as.matrix(H_tf)
