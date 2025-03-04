@@ -1,0 +1,32 @@
+
+
+
+### load in the ppi network
+string <- read.delim("./GRACKLE_data/9606.protein.links.v12.0.txt", sep = " ")
+string$score <- string$combined_score/1000
+info <- read.delim("./GRACKLE_data/9606.protein.aliases.v12.0.txt", sep= "\t")
+info_filt <- info %>%
+    filter(source== "Ensembl_HGNC_symbol") %>%
+    select(-source)
+string_HGNC <- string %>%
+    left_join(info_filt, by = c("protein1" = "X.string_protein_id"), relationship = "many-to-many") %>%
+    left_join(info_filt, by = c("protein2" = "X.string_protein_id"), relationship = "many-to-many")
+names(string_HGNC)[-c(1:4)] <- c("from","to")
+
+string_filt <- string_HGNC %>%
+    select(from,to,score) %>%
+    distinct(from,to, .keep_all = T)
+
+string_adj <- string_filt %>%
+    filter(!is.na(from) & !is.na(to))%>%
+    pivot_wider(id_cols = "from", names_from = "to", values_from = "score") %>%
+    arrange(match(from, names(.))) %>%
+    column_to_rownames("from")
+
+
+diag(string_adj) <- 1
+
+dim(string_adj)
+string_adj[1:10,1:10]
+
+save(string_adj, file = "./GRACKLE_data/STRING_adjacency.RData")

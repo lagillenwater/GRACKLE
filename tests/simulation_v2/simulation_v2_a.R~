@@ -1,0 +1,20 @@
+########
+## This is a script for simulation studies to evaluate the GRACKLE algorithm.
+#######
+
+## Libraries
+
+## For graph clustering
+library(igraph)
+
+### load in the ppi network
+network <- get(load("./GRACKLE_data/STRING_adjacency.RData"))
+
+## coverte to igraph object
+new_g <- graph_from_adjacency_matrix(as.matrix(network), weighted = T)
+
+## set seed for reproducibility
+set.seed(42)
+clusters <- cluster_louvain(new_g)
+
+

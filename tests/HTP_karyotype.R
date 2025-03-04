@@ -129,7 +129,11 @@ verbose = F
 beta = 0
 error_terms = F
 
-dbs <- c(  "GO_Biological_Process_2023")
+dbs <- listEnrichrDbs()
+dbs$libraryName
+
+dbs <- c(  "MSigDB_Hallmark_2020")
+dbs <- c(  "Human_Phenotype_Ontology")
 
 for(k in 10) {
     grackle <- GRACKLE(
@@ -137,8 +141,8 @@ for(k in 10) {
         net_similarity = net_similarity,
         patient_similarity = patient_similarity,
         diff_threshold = 1e-6,
-        lambda_1 = 1,
-        lambda_2 =1,
+        lambda_1 = .1,
+        lambda_2 =.1,
         k = k)
     W_eval <- cbind(metadata,grackle$W)
     condition_scores <- sapply(names(metadata), function(y){
@@ -147,34 +151,37 @@ for(k in 10) {
             ## print(m0)
             p <- m0$p.value
             ##b <- m0$estimate[2] - m0$estimate[1]
-            ##p <- ifelse(b>0,p,-1*p)
+            b1 <- mean((W_eval %>% filter(!!sym(y) == 1) %>% select(!!sym(paste0("LV",x))))[,1])
+            b0 <- mean((W_eval %>% filter(!!sym(y) == 0) %>% select(!!sym(paste0("LV",x))))[,1])
+            b <- b1-b0
+            p <- ifelse(b>0,p,-1*p)
             return(p)
             ##qnorm(p/2)/sqrt(nrow(W_eval))
         })
     })
     sig_conditions<- apply(condition_scores,1,function(x) {
         sig <- which(abs(x) < .05)
-        sum_sig <- ifelse(x[sig] > 0,"+++","---")
+        sum_sig <- ifelse(x[sig] > 0,"+","-")
         names_sig <- names(sig)
-        paste(c(sum_sig,names_sig),collapse  = " ")
+        paste(sum_sig,names_sig, collapse = " ")
     })
     names(sig_conditions) <- paste0("LV",1:k)
     sig_conditions <- sig_conditions[sig_conditions != ""]
+    ##print(sig_conditions)
     print(paste("for K ", k, " significant:" ,length(sig_conditions)))
 #    print(apply(grackle$H, 1, function(x) cor(grackle$H[1,], x)))
     colnames(grackle$H) <- colnames(htp_expression)
     rownames(grackle$H) <- paste0("LV",1:k)
-    ## enrichments <- lapply( names(sig_conditions), function(rank){
-    ##     gene_loadings <- grackle$H[rank,]
-    ##     cutoff <- floor(.05 * ncol(htp_expression))
-    ##     input_genes <- names(sort(gene_loadings, decreasing = T)[1:cutoff])
-    ##     enriched <- enrichr(input_genes, dbs, background = names(htp_expression))
-    ##     unlist(lapply(enriched, function(x) x %>% filter(Adjusted.P.value < .01) %>% select(Term)))
-    ## })
-    ## names(enrichments) <- names(sig_conditions)
+    enrichments <- lapply( names(sig_conditions), function(rank){
+        gene_loadings <- grackle$H[rank,]
+        cutoff <- floor(.05 * ncol(htp_expression))
+        input_genes <- names(sort(gene_loadings, decreasing = T)[1:cutoff])
+        enriched <- enrichr(input_genes, dbs, background = names(htp_expression))
+        paste(unlist(lapply(enriched, function(x) x %>% filter(Adjusted.P.value < .05) %>% select(Term))),collapse  = " ")
+    })
+    names(enrichments) <- names(sig_conditions)
+    print(paste(sig_conditions, " | ", enrichments))
 }
-
-
 
 inner_scores <- lapply( names(metadata), function(col) {
     tmp <- as.data.frame(table(top,metadata[[col]]) ) %>%
