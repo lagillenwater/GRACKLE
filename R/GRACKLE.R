@@ -60,111 +60,63 @@ GRACKLE <- function(
     policy <- tf$keras$mixed_precision$Policy('mixed_float16')
     tf$keras$mixed_precision$set_global_policy(policy)
 
-    ## calc degree
-    ##D_p <- diag(rowSums(patient_similarity)) + diag(colSums(patient_similarity))
-    ##D_g <- diag(rowSums(net_similarity)) + diag(colSums(net_similarity))
-    
-    
-    ## Initialize matrices
-    ## random
-    n <- nrow(Y)
-    m <- ncol(Y)
-    set.seed(42)
-    W <- matrix(runif(n * k, min = min(Y), max = max(Y) ), nrow = n, ncol = k)
-    set.seed(42)
-    H <- matrix(runif(k * m, min = min(Y), max = max(Y)), nrow = k, ncol = m)
-
     ## Perform SVD
-    ## svd_result <- svd(Y)
-    ## ## Initialize W and H matrices using SVD
-    ## W <- abs(svd_result$u[,1:k] %*% diag(svd_result$d[1:k]))
-    ## H <- t(abs(svd_result$v[,1:k]))
+    svd_result <- svd(Y)
+    ## Initialize W and H matrices using SVD
+    W <- abs(svd_result$u[,1:k] %*% diag(svd_result$d[1:k]))
+    H <- t(abs(svd_result$v[,1:k]))
+    W <- min_max_scale(W, min_vals = apply(W,2,min), max_vals = apply(W,2,max)) 
+    H <- t(min_max_scale(t(H), min_vals = apply(H,1,min), max_vals = apply(H,1,max))) 
+    W <- tf$convert_to_tensor(W, dtype = tf$float16)
+    H <- tf$convert_to_tensor(H, dtype = tf$float16)
+    
+    Y <- tf$constant(Y, dtype = tf$float16)
+    
 
-    Y_tf <- tf$convert_to_tensor(Y, dtype = tf$float16)
+    
     patient_similarity_tf <- tf$convert_to_tensor(patient_similarity, dtype = tf$float16)
-    net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float16)
-    W_tf <- tf$convert_to_tensor(W, dtype = tf$float16)
-    H_tf <- tf$convert_to_tensor(H, dtype = tf$float16)
+    ## net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float16)
     D_p_tf <- tf$linalg$diag(tf$reduce_sum(patient_similarity_tf, axis = as.integer(0)))
-    D_g_tf <- tf$linalg$diag(tf$reduce_sum(net_similarity_tf, axis = as.integer(0)))
+    L_p_tf <- D_p_tf - patient_similarity_tf
     
-    ## normalize the Laplacians
-    ## Calculate the inverse square root of D_p
-    ## L_p_norm <- tf$matmul(tf$matmul(D_p_inv_sqrt, L_p), D_p_inv_sqrt)
-    ## L_g_norm <- tf$matmul(tf$matmul(D_g_inv_sqrt, L_g), D_g_inv_sqrt)
-
-    ## Normalize the degree matrix
-    ## D_p_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_p))^-1)
-    ## D_g_inv_sqrt <- tf$linalg$diag(tf$sqrt(tf$linalg$diag_part(D_g))^-1)
     
-##   for(i in 1:iterations) {
-##        print(i)
-     H_diff <- 1        
-  while(H_diff > diff_threshold) {
-##        ## oldH <- H
-     oldH_tf <- H_tf
-      ## Iteratively update matrices
-      ## base code ######
-      ## W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W))
-      ## W <- apply(W,2,function(x) scale(x,center = F))
-      ## H <-H *  ((crossprod(W ,Y) +  H %*% net_similarity*lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
-      ## H <- t(apply(H,1,function(x) scale(x,center = F)))
-      ## tensor  #######
-      ##      print(colSums(as.matrix(W_tf)))
-      ## print(rowSums(as.matrix(H_tf)))
-      ## Numerator and Denominator for W update
-      numerator_W <- tf$add(tf$matmul(Y_tf, H_tf, transpose_b = TRUE), lambda_1 * tf$matmul(patient_similarity_tf, W_tf))
-      denominator_W <- tf$add(tf$matmul(W_tf, tf$matmul(H_tf, H_tf, transpose_b = TRUE)), lambda_1 * tf$matmul(D_p_tf, W_tf))
-      W_tf <- tf$multiply(W_tf, tf$divide(numerator_W, denominator_W))
-      numerator_H <- tf$add(tf$matmul(W_tf, Y_tf, transpose_a = TRUE), tf$matmul(H_tf, net_similarity_tf) * lambda_2)
-      denominator_H <- tf$add(tf$matmul(tf$matmul(W_tf, W_tf, transpose_a = TRUE), H_tf), tf$matmul(H_tf, D_g_tf) * lambda_2)
-      H_tf <- tf$multiply(H_tf, tf$divide(numerator_H, denominator_H))
-      ## H_tf_transposed <- tf$transpose(H_tf)
-      ## H_tf_scaled_transposed <- tf$map_fn(scale_without_centering, H_tf_transposed, dtype = tf$float64)
-      ## H_tf <- tf$transpose(H_tf_scaled_transposed)
-      ## Calculate the difference
-      diff <- tf$subtract(H_tf, oldH_tf)
-      ## Calculate the numerator: sum((H - oldH)^2)
-      numerator <- tf$reduce_sum(tf$square(diff))
-      ## Calculate the denominator: sum(H^2)
-      denominator <- tf$reduce_sum(tf$square(H_tf))
-      ## Calculate _diff
-      H_diff <- tf$math$divide(numerator, denominator)
-      H_diff <- as.numeric(H_diff)
-#      print(H_diff)
+    ## calculate the loss value
+    reconstruction_loss <- tf$norm(tf$cast(Y - tf$matmul(W, H), dtype = tf$float32), ord = 'euclidean')$numpy() 
+    graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
+    prev_obj_value <- reconstruction_loss + graph_loss
+    ## print(paste("graph loss:", graph_loss))
+    ## print(paste("total_loss:",prev_obj_value))
+    
+    for(i in 1:iterations){
+        ## Update H
+        H <- H * (tf$matmul(tf$transpose(W),Y ) / (tf$matmul(tf$transpose(W), tf$matmul(W, H))))
+        ## Update W
+        W <- W * ((tf$matmul(Y, tf$transpose(H)) + (lambda_1 * tf$matmul(patient_similarity_tf,W))) / (tf$matmul(W, tf$matmul(H, tf$transpose(H))) + (lambda_1 * tf$matmul(D_p_tf,W))))
+        ## Normalize W and H
+        W <- W / (tf$reduce_sum(W, axis = as.integer(1), keepdims = TRUE) )
+        H <- H / (tf$reduce_sum(H, axis = as.integer(0), keepdims = TRUE) )
+        ## Check for convergence
+        reconstruction_loss <- tf$norm(tf$cast(Y - tf$matmul(W, H), dtype = tf$float32), ord = 'euclidean')$numpy() 
+        graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
+        curr_obj_value <- reconstruction_loss + graph_loss
+        ##print(paste("graph loss:", graph_loss))
+        ##print(paste("total_loss:",curr_obj_value))
+            
+        if((abs(prev_obj_value - curr_obj_value)/prev_obj_value)  < diff_threshold) {
+             break
+        }
+        ## Update the previous objective value
+        prev_obj_value <- curr_obj_value
     }
-    
-    W <- as.matrix(W_tf)
-    H <- as.matrix(H_tf)
 
-
+    W <- W$numpy()
+    H <- H$numpy()
     colnames(W) <- paste0("LV",1:k)
     rownames(H) <- paste0("LV",1:k)
     
-    if(error_terms) {
-        out <- list(residual=(Y-W%*%H), H=H, W=W,error = reconstruction_error_vec,H_diff = H_diff_vec, W_diff= W_diff_vec, pat_sim_error_vec = pat_sim_error_vec, grn_error_vec=grn_error_vec )
-    } else {
-        out <- list( H=H, W=W)
-    } 
-    
-    return(out)
+        
+    return(list(W =W, H= H))
 
-    ## if(error_terms) {
-    ##             ## Error vectors
-    ##     error_vec <- numeric()
-    ##     reconstruction_error_vec <- numeric()
-    ##     pat_sim_error_vec <- numeric()
-    ##     grn_error_vec <- numeric()
-    ##             reconstruction_error <- sum((Y-W%*%H)^2)
-    ##     pat_sim_error <- lambda_1 * sum(diag(crossprod(W,L_p)%*%W))
-    ##     grn_error <-lambda_2 * sum(diag(tcrossprod(H %*% L_g,H)))
-    ##     reconstruction_error_vec <- c(reconstruction_error_vec, reconstruction_error)
-    ##     pat_sim_error_vec <- c(pat_sim_error_vec, pat_sim_error)
-    ##     grn_error_vec <- c(grn_error_vec, grn_error)
-    ##     if(verbose) {
-    ##         message("reconstruction error=", round(reconstruction_error,2), " | patient similarity error=", round(pat_sim_error,2), " | grn error=", round(grn_error,2))
-    ##     }
-    ## }
 
     
 }
