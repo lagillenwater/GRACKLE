@@ -26,7 +26,6 @@ breast_subtype_metadata[is.na(breast_subtype_metadata)] <- 0
 
 
 ## load the graph and expression data
-
 load( file = "../GRACKLE_data/data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
 load( file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 

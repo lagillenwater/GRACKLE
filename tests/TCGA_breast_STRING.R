@@ -1,0 +1,151 @@
+#setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
+library(tidyverse)
+library(igraph)
+library(devtools)
+library(ggplot2)
+library(parallel)
+library(aricode)
+library(SummarizedExperiment)
+library(reticulate)
+use_virtualenv("/mnt/grackle_env")
+library(tensorflow)
+library(devtools)
+load_all()
+
+load("../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
+
+breast_subtype_metadata <- metadata %>%
+  as.data.frame() %>%
+  dplyr::select(paper_BRCA_Subtype_PAM50) %>%
+  drop_na(paper_BRCA_Subtype_PAM50) %>%
+  rownames_to_column("ID") %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = paper_BRCA_Subtype_PAM50, values_from = value) %>%
+    column_to_rownames("ID") 
+breast_subtype_metadata[is.na(breast_subtype_metadata)] <- 0
+
+
+## load the graph and expression data
+load(file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_STRING_network.RData")
+load(file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_gene_expression_with_PAM50.RData")
+
+expression <- as.data.frame(t(expression_data))
+tokeep <- colnames(expression)[colnames(expression) %in% colnames(net_similarity_filtered)]
+expression <- expression %>%
+    filter(rownames(.) %in% rownames(breast_subtype_metadata)) %>%
+    select(tokeep)
+
+
+dim(net_similarity_filtered)
+dim(expression)
+
+k= 10
+
+counter =1
+results <- list()
+
+for ( x in 1:50) {
+  
+    print(paste("itertion",x))
+
+    dat <- split_data(expression, breast_subtype_metadata , training_size = .7, seed = x)
+    pat_sim <- as.matrix(dat$train_metadata) %*% t(dat$train_metadata)
+    min_vals <- apply(dat$train_expression,2, min) 
+    max_vals <- apply(dat$train_expression,2, max) 
+  ## min-max scale the input matrix
+    dat$train_expression <-as.matrix( min_max_scale(dat$train_expression,min_vals,max_vals))
+    dat$test_expression <- as.matrix(min_max_scale(dat$test_expression,min_vals,max_vals))
+
+
+    dim(dat$train_expression)
+    dim(dat$test_expression)    
+    
+    train_clusters <- dat$train_metadata %>%
+        rownames_to_column("sample") %>%
+        pivot_longer(cols = -sample)%>%
+        filter(value ==1) %>%
+        select(-value)
+
+    test_clusters <- dat$test_metadata %>%
+        rownames_to_column("sample") %>%
+        pivot_longer(cols = -sample)%>%
+        filter(value ==1) %>%
+        select(-value)
+
+        ## patient clustering of data
+    set.seed(42)
+    train_kmeans = kmeans(dat$train_expression, centers = 5, iter.max = 100, nstart =3)$cluster
+    train_ari= ARI(train_kmeans, train_clusters$name)
+
+    set.seed(42)
+    test_kmeans = kmeans(dat$test_expression, centers = 5, iter.max = 100, nstart =3)$cluster
+    test_ari= ARI(test_kmeans, test_clusters$name)
+
+
+        ## Perform SVD
+    svd_result <- svd(dat$train_expression)
+    svd_W <- abs(svd_result$u[,1:k] %*% diag(svd_result$d[1:k]))
+    svd_H <- t(abs(svd_result$v[,1:k]))
+    svd_W <- min_max_scale(svd_W, min_vals = apply(svd_W,2,min), max_vals = apply(svd_W,2,max)) 
+    svd_H <- t(min_max_scale(t(svd_H), min_vals = apply(svd_H,1,min), max_vals = apply(svd_H,1,max)))
+
+    set.seed(42)
+    svd_kmeans = kmeans(svd_W,centers = 5, iter.max = 100, nstart =5)$cluster
+    svd_ari = ARI(svd_kmeans, train_clusters$name)
+        
+
+    for(i in c(0,.01,.1,1)) {
+        for(j in c(0,.01,.1, 1)) {
+
+            ## run GRACKLE NMF
+
+            grackle <- GRACKLE(
+                Y = dat$train_expression,
+                net_similarity = net_similarity_filtered,
+                patient_similarity = pat_sim,
+                diff_threshold = 1e-5,
+                lambda_1 = i,
+                lambda_2 =j,
+                k = k,
+                verbose = F,
+                beta = 0,
+                iterations = 500,
+                svd_W = svd_W,
+                svd_H = svd_H)
+
+            set.seed(42)
+            train_w_kmeans = kmeans(grackle$W,centers = 5, iter.max = 100, nstart =5)$cluster
+            train_w_ari = ARI(train_w_kmeans, train_clusters$name)
+
+            set.seed(42)
+            W_test <- project_W(dat$test_expression,as.matrix(grackle$H))
+            test_w_kmeans = kmeans(W_test,centers = 5, iter.max = 100, nstart =5)$cluster
+            test_w_ari = ARI(test_w_kmeans, test_clusters$name)
+            
+            results[[counter]] <- c(i,j,train_ari, test_ari,  train_w_ari, test_w_ari,  svd_ari)
+            counter = counter+1
+
+        }
+    }
+    save(results, file = "TCGA_results_v2.RData")
+
+}
+
+results <- do.call(rbind,results)
+colnames(results) <- c('lambda_1', 'lambda_2',"train_ari", 'test_ari',  'train_w_ari', 'test_w_ari',  'svd_ari')
+save(results, file = "TCGA_results_v2.RData")
+
+results_summary <- results %>%
+    as.data.frame() %>%
+    group_by(lambda_1,lambda_2) %>%
+    mutate(mean_train_w_ari = mean(train_w_ari),
+           mean_test_w_ari = mean(test_w_ari),
+           ) %>%
+    distinct(lambda_1,lambda_2, .keep_all = T) %>%
+    select(-c(train_w_ari, test_w_ari))
+
+
+save(results_summary, file = "TCGA_results_summary_v2.RData")
+
+
+

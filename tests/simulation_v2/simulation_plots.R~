@@ -1,0 +1,18 @@
+library(ggplot2)
+library(tidyverse)
+load("simulation_v2_results_summary_2.RData")
+
+results_toplot <- results_summary %>%
+    pivot_longer(cols = -c(lambda_1,lambda_2))
+
+ggplot(results_toplot, aes( x= lambda_1, y = value, color = name)) +
+    geom_violin()
+
+tmp_toplot <- results_summary %>%
+    ungroup() %>%
+    select(lambda_1,  mean_train_w_ari, mean_test_w_ari) %>%
+    pivot_longer(cols = -lambda_1)
+
+ggplot(tmp_toplot, aes( x= as.factor(lambda_1), y = value, color = name)) +
+    geom_violin()
+

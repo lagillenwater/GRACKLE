@@ -72,8 +72,9 @@ expression_data <- expression_data %>%
   dplyr::select(-ensembl_ids)
 
 
+## load the network data
 
-load("../GRACKLE_data/data/Breast/directed_breast_network.RData")  
+## load("../GRACKLE_data/data/Breast/directed_breast_network.RData")  
 
 
 ## filter by 
@@ -83,21 +84,21 @@ length(tokeep)
 expression_data <- expression_data %>%
   filter(rownames(.) %in% names(tokeep))
 
+load("./GRACKLE_data/STRING_adjacency.RData")
+net_similarity_filtered <- net_similarity[rownames(net_similarity) %in% names(tokeep), colnames(net_similarity) %in% names(tokeep)]
+save(net_similarity_filtered, file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_STRING_network.RData")
 
+## library(igraph)
+## directed_breast_g_with_PAM50 <- graph_from_data_frame(directed_breast_network %>% dplyr::select(from,to,weight), directed = TRUE)
+## save(directed_breast_g_with_PAM50, file = "../GRACKLE_data/data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
+## expression_data <- expression_data %>%
+##   filter(rownames(.) %in% union(directed_breast_network$from,directed_breast_network$to))
+## save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
-directed_breast_network <- directed_breast_network %>%
-  filter(from %in% rownames(expression_data) & to %in% rownames(expression_data))
-
-library(igraph)
-
-directed_breast_g_with_PAM50 <- graph_from_data_frame(directed_breast_network %>% dplyr::select(from,to,weight), directed = TRUE)
-save(directed_breast_g_with_PAM50, file = "../GRACKLE_data/data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
 
 expression_data <- expression_data %>%
-  filter(rownames(.) %in% union(directed_breast_network$from,directed_breast_network$to))
-
-
-save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
+  filter(rownames(.) %in% colnames(net_similarity_filtered))
+save(expression_data, file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_gene_expression_with_PAM50.RData")
 
 
 ## filtering out PAM50 genes
