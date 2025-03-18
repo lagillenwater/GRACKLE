@@ -39,83 +39,139 @@ GRACKLE <- function(
     verbose = FALSE,
     beta = 0,
     error_terms = FALSE,
-    iterations = 100) {
+    iterations = 100,
+    svd_W,
+    svd_H) {
 
-                                        # Ensure TensorFlow uses the GPU
+    ## Ensure TensorFlow uses the GPU
     Sys.setenv(TF_ENABLE_ONEDNN_OPTS = "0")
     Sys.setenv(TF_CPP_MIN_LOG_LEVEL = "3")
     physical_devices <- tf$config$list_physical_devices('GPU')
-        if (length(physical_devices) > 0) {
+    if (length(physical_devices) > 0) {
         suppressMessages({
             suppressWarnings({
                 tf$config$experimental$set_memory_growth(physical_devices[[1]], TRUE)
                 tf$config$set_visible_devices(physical_devices[[1]], 'GPU')
             })
         })
-        } else {
-      print("No GPU found. Using CPU.")
+    } else {
+        print("No GPU found. Using CPU.")
     }
-
     ## Enable mixed precision
     policy <- tf$keras$mixed_precision$Policy('mixed_float16')
     tf$keras$mixed_precision$set_global_policy(policy)
 
-    ## Perform SVD
-    svd_result <- svd(Y)
-    ## Initialize W and H matrices using SVD
-    W <- abs(svd_result$u[,1:k] %*% diag(svd_result$d[1:k]))
-    H <- t(abs(svd_result$v[,1:k]))
-    W <- min_max_scale(W, min_vals = apply(W,2,min), max_vals = apply(W,2,max)) 
-    H <- t(min_max_scale(t(H), min_vals = apply(H,1,min), max_vals = apply(H,1,max))) 
-    W <- tf$convert_to_tensor(W, dtype = tf$float16)
-    H <- tf$convert_to_tensor(H, dtype = tf$float16)
-    
-    Y <- tf$constant(Y, dtype = tf$float16)
     
 
-    
+
+    success <- FALSE
+    while(!success) {
+        tryCatch({
+            W <- tf$convert_to_tensor(svd_W, dtype = tf$float16)
+            H <- tf$convert_to_tensor(svd_H, dtype = tf$float16)
+            Y <- tf$constant(Y, dtype = tf$float16)
+            success <- TRUE
+        }, error = function(e) {
+            cat("Error occurred: ", e$message, "\nRetrying...\n")
+        })
+    }
     patient_similarity_tf <- tf$convert_to_tensor(patient_similarity, dtype = tf$float16)
-    ## net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float16)
-    D_p_tf <- tf$linalg$diag(tf$reduce_sum(patient_similarity_tf, axis = as.integer(0)))
+    net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float16)
+    D_p_tf <- tf$linalg$diag(tf$reduce_sum(patient_similarity_tf, axis= as.integer(0)))
     L_p_tf <- D_p_tf - patient_similarity_tf
-    
-    
+    D_g_tf <- tf$linalg$diag(tf$reduce_sum(net_similarity_tf, axis = as.integer(0)))
+    L_g_tf= D_g_tf - net_similarity_tf
     ## calculate the loss value
     reconstruction_loss <- tf$norm(tf$cast(Y - tf$matmul(W, H), dtype = tf$float32), ord = 'euclidean')$numpy() 
-    graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
-    prev_obj_value <- reconstruction_loss + graph_loss
-    ## print(paste("graph loss:", graph_loss))
-    ## print(paste("total_loss:",prev_obj_value))
-    
-    for(i in 1:iterations){
+    pat_graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
+    if(!is.finite(pat_graph_loss)) {
+        tmp_W <- tf$cast(W,dtype=tf$float32)
+        tmp_L_p_tf <- tf$cast(L_p_tf, dtype = tf$float32)
+        pat_graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(tmp_W,tf$matmul(tmp_L_p_tf,tmp_W),transpose_a = T))$numpy()
+    }
+    gene_graph_loss <-  lambda_2 * tf$reduce_sum(tf$matmul(H,tf$matmul(L_g_tf,H, transpose_b = T)))$numpy()
+    if(!is.finite(gene_graph_loss)) {
+        tmp_H <- tf$cast(H,dtype=tf$float32)
+        tmp_L_g_tf <- tf$cast(L_g_tf, dtype = tf$float32)
+        gene_graph_loss <-  lambda_2 * tf$reduce_sum(tf$matmul(tmp_H,tf$matmul(tmp_L_g_tf,tmp_H, transpose_b=T)))$numpy()
+    }
+    prev_obj_value <- gene_graph_loss + pat_graph_loss + reconstruction_loss
+    if(verbose){
+        print(paste("reconstruction loss:", reconstruction_loss))
+        print(paste("patient graph loss:", pat_graph_loss))
+        print(paste("gene graph loss:", gene_graph_loss))
+        print(paste("total_loss:",prev_obj_value))
+    }
+
+    counter = 1
+    for(i in 1:292){
         ## Update H
-        H <- H * (tf$matmul(tf$transpose(W),Y ) / (tf$matmul(tf$transpose(W), tf$matmul(W, H))))
+        H <- H * ((tf$matmul(tf$transpose(W),Y ) + (lambda_2 * tf$matmul(H,net_similarity_tf))) / (tf$matmul(tf$transpose(W), tf$matmul(W, H)) + (lambda_2* tf$matmul(H,D_g_tf))))
+        ## H_norms <- tf$norm(H, axis = as.integer(0))
+        ## H <- H/H_norms
         ## Update W
         W <- W * ((tf$matmul(Y, tf$transpose(H)) + (lambda_1 * tf$matmul(patient_similarity_tf,W))) / (tf$matmul(W, tf$matmul(H, tf$transpose(H))) + (lambda_1 * tf$matmul(D_p_tf,W))))
-        ## Normalize W and H
-        W <- W / (tf$reduce_sum(W, axis = as.integer(1), keepdims = TRUE) )
-        H <- H / (tf$reduce_sum(H, axis = as.integer(0), keepdims = TRUE) )
+        ## W_norms <- tf$norm(W, axis = as.integer(0))
+        ## W <- W/W_norms
         ## Check for convergence
-        reconstruction_loss <- tf$norm(tf$cast(Y - tf$matmul(W, H), dtype = tf$float32), ord = 'euclidean')$numpy() 
-        graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
-        curr_obj_value <- reconstruction_loss + graph_loss
-        ##print(paste("graph loss:", graph_loss))
-        ##print(paste("total_loss:",curr_obj_value))
-            
+        success <- FALSE
+        while(!success) {
+            tryCatch({
+                tmp_W <- tf$cast(W,dtype=tf$float32)
+                tmp_H <- tf$cast(H,dtype=tf$float32)
+                tmp_Y <- tf$cast(Y, dtype=tf$float32)
+                reconstruction_loss <- tf$norm(tf$cast(tmp_Y - tf$matmul(tmp_W, tmp_H), dtype = tf$float32), ord = 'euclidean')$numpy()
+                success <- TRUE
+            }, error = function(e) {
+                cat("Error occurred: ", e$message, "\nRetrying...\n")
+            })
+        }
+        pat_graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(W,tf$matmul(L_p_tf,W),transpose_a = T))$numpy()
+        if(!is.finite(pat_graph_loss)) {
+            tmp_W <- tf$cast(W,dtype=tf$float32)
+            tmp_L_p_tf <- tf$cast(L_p_tf, dtype = tf$float32)
+            pat_graph_loss <-  lambda_1 * tf$reduce_sum(tf$matmul(tmp_W,tf$matmul(tmp_L_p_tf,tmp_W),transpose_a = T))$numpy()
+        }
+        gene_graph_loss <-  lambda_2 * tf$reduce_sum(tf$matmul(H,tf$matmul(L_g_tf,H, transpose_b = T)))$numpy()
+        if(!is.finite(gene_graph_loss)) {
+            tmp_H <- tf$cast(H,dtype=tf$float32)
+            tmp_L_g_tf <- tf$cast(L_g_tf, dtype = tf$float32)
+            gene_graph_loss <-  lambda_2 * tf$reduce_sum(tf$matmul(tmp_H,tf$matmul(tmp_L_g_tf,tmp_H, transpose_b=T)))$numpy()
+        }
+        curr_obj_value <- gene_graph_loss + pat_graph_loss + reconstruction_loss
+        if(verbose) {
+            print(paste("reconstruction loss:", reconstruction_loss))
+            print(paste("pat graph loss:", pat_graph_loss))
+            print(paste("gene graph loss:", gene_graph_loss))
+            print(paste("total_loss:",curr_obj_value))
+            print(counter)
+        }
         if((abs(prev_obj_value - curr_obj_value)/prev_obj_value)  < diff_threshold) {
              break
         }
         ## Update the previous objective value
         prev_obj_value <- curr_obj_value
+        ## update counter
+        counter = counter+1
     }
 
     W <- W$numpy()
     H <- H$numpy()
     colnames(W) <- paste0("LV",1:k)
     rownames(H) <- paste0("LV",1:k)
-    
+    ##W <- min_max_scale(W, min_vals = apply(W,2,min), max_vals = apply(W,2,max)) 
+    ##H <- t(min_max_scale(t(H), min_vals = apply(H,1,min), max_vals = apply(H,1,max)))
+
+    if(verbose) {
+        print(paste("reconstruction loss:", reconstruction_loss))
+        print(paste("pat graph loss:", pat_graph_loss))
+        print(paste("gene graph loss:", gene_graph_loss))
+        print(paste("total_loss:",curr_obj_value))
+        print(counter)
+    }
+
         
-    return(list(W =W, H= H))
+    return(list(W =W, H= H, svd_W = svd_W, svd_H=svd_H))
 
 
     

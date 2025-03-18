@@ -8,10 +8,9 @@
 #' @import nnls
 #' @param test_expression Data.frame of test expression data
 #' @param H_train Matrix of trained H matrix
-#' @param k Numeric value representing the number of groups
 #' @return W_test Matrix of project W values for the test data
 #' @export
-project_W <- function(test_data,H_train,k) {
+project_W <- function(test_data,H_train) {
   
   k <- nrow(H_train)
   ## Initialize W_test
@@ -36,6 +35,36 @@ project_W <- function(test_data,H_train,k) {
   return(W_test)
 }
 
+#' project_H
+#' 
+#'  Function for predicting categorical labels in test data
+#'
+#' @import nnls
+#' @param test_expression Data.frame of test expression data
+#' @param W_train Matrix of trained H matrix
+#' @return H_test Matrix of project W values for the test data
+#' @export
+project_H <- function(test_data, W_train) {
+
+    k <- ncol(W_train)
+    ## Initialize H_test
+    H_test <- matrix(0, nrow = ncol(test_data), ncol = k)
+
+    row_names <- colnames(test_data)
+
+    test_data_t <- t(test_data)
+
+    ## Solve for H_test using NNLS
+    for (i in 1:nrow(test_data_t)) {
+        nnls_result <- nnls(W_train, test_data_t[i, ])
+        H_test[i, ] <- coef(nnls_result)
+    }
+
+    rownames(H_test) <- row_names
+    colnames(H_test) <- colnames(W_train)
+
+    return(t(H_test))
+    }
 
 #' categoricalPredication
 #' 
