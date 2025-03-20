@@ -82,45 +82,56 @@ GRACKLE <- function(
     net_similarity_tf <- tf$convert_to_tensor(net_similarity, dtype = tf$float64)
     D_p_tf <- tf$convert_to_tensor(D_p, dtype = tf$float64)
     D_g_tf <- tf$convert_to_tensor(D_g, dtype = tf$float64)
-    W_tf <- tf$convert_to_tensor(W, dtype = tf$float64)
-    H_tf <- tf$convert_to_tensor(H, dtype = tf$float64)
+    W <- tf$convert_to_tensor(W, dtype = tf$float64)
+    H <- tf$convert_to_tensor(H, dtype = tf$float64)
 
     for(i in 1:iterations) {
-        ##   H_diff <- 1        
+        H_diff <- 1        
 #    while(H_diff > diff_threshold) {
-##         oldH <- H
-##          oldH_tf <- H_tf
+        ##         oldH <- H
+        
+        oldH_tf <- H
         ## Iteratively update matrices
         ## W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W))
         ## W <- apply(W,2,function(x) scale(x,center = F))
         ## H <-H *  ((crossprod(W ,Y) +  H %*% net_similarity*lambda_2) / (crossprod(W,W) %*% H + H%*% D_g * lambda_2 ) )
         ## H <- t(apply(H,1,function(x) scale(x,center = F))) 
                                         # Numerator and Denominator for W update
-        numerator_W <- tf$add(tf$matmul(Y_tf, H_tf, transpose_b = TRUE), lambda_1 * tf$matmul(patient_similarity_tf, W_tf))
-        denominator_W <- tf$add(tf$matmul(W_tf, tf$matmul(H_tf, H_tf, transpose_b = TRUE)), lambda_1 * tf$matmul(D_p_tf, W_tf))
-        W_tf <- tf$multiply(W_tf, tf$divide(numerator_W, denominator_W))
-        ##        W_tf <- tf$map_fn(scale_without_centering, W_tf, dtype = tf$float64)
-        numerator_H <- tf$add(tf$matmul(W_tf, Y_tf, transpose_a = TRUE), tf$matmul(H_tf, net_similarity_tf) * lambda_2)
-        denominator_H <- tf$add(tf$matmul(tf$matmul(W_tf, W_tf, transpose_a = TRUE), H_tf), tf$matmul(H_tf, D_g_tf) * lambda_2)
-        H_tf <- tf$multiply(H_tf, tf$divide(numerator_H, denominator_H))
+        
+        W <- W * ((tf$matmul(Y, tf$transpose(H)) + (lambda_1 * tf$matmul(patient_similarity_tf,W))) / (tf$matmul(W, tf$matmul(H, tf$transpose(H))) + (lambda_1 * tf$matmul(D_p_tf,W))))
+        W <- apply(as.matrix(W),2,function(x) scale(x,center = F))
+        W <- tf$convert_to_tensor(W, dtype = tf$float64)
+        H <- H * ((tf$matmul(tf$transpose(W),Y ) + (lambda_2 * tf$matmul(H,net_similarity_tf))) / (tf$matmul(tf$transpose(W), tf$matmul(W, H)) + (lambda_2* tf$matmul(H,D_g_tf))))
+        H <- t(apply(H,1,function(x) scale(x,center = F)))
+        H <- tf$convert_to_tensor(H, dtype = tf$float64)    
+        ## numerator_W <- tf$add(tf$matmul(Y_tf, H_tf, transpose_b = TRUE), lambda_1 * tf$matmul(patient_similarity_tf, W_tf))
+        ## denominator_W <- tf$add(tf$matmul(W_tf, tf$matmul(H_tf, H_tf, transpose_b = TRUE)), lambda_1 * tf$matmul(D_p_tf, W_tf))
+        ## W_tf <- tf$multiply(W_tf, tf$divide(numerator_W, denominator_W))
+        ## W_tf <- tf$map_fn(scale_without_centering, W_tf, dtype = tf$float64)
+        ## numerator_H <- tf$add(tf$matmul(W_tf, Y_tf, transpose_a = TRUE), tf$matmul(H_tf, net_similarity_tf) * lambda_2)
+        ## denominator_H <- tf$add(tf$matmul(tf$matmul(W_tf, W_tf, transpose_a = TRUE), H_tf), tf$matmul(H_tf, D_g_tf) * lambda_2)
+        ## H_tf <- tf$multiply(H_tf, tf$divide(numerator_H, denominator_H))
         ## H_tf_transposed <- tf$transpose(H_tf)
         ## H_tf_scaled_transposed <- tf$map_fn(scale_without_centering, H_tf_transposed, dtype = tf$float64)
         ## H_tf <- tf$transpose(H_tf_scaled_transposed)
              # Calculate the difference
-        ##  diff <- tf$subtract(H_tf, oldH_tf)
-        ##                                 # Calculate the numerator: sum((H - oldH)^2)
-        ##  numerator <- tf$reduce_sum(tf$square(diff))
-        ##                                 # Calculate the denominator: sum(H^2)
-        ##  denominator <- tf$reduce_sum(tf$square(H_tf))
-        ##                                 # Calculate _diff
-        ## H_diff <- tf$math$divide(numerator, denominator)
-        ## H_diff <- as.numeric(H_diff)
-        ## print(H_diff)
+         diff <- tf$subtract(H, oldH_tf)
+                                        # Calculate the numerator: sum((H - oldH)^2)
+         numerator <- tf$reduce_sum(tf$square(diff))
+                                        # Calculate the denominator: sum(H^2)
+         denominator <- tf$reduce_sum(tf$square(H))
+                                        # Calculate _diff
+        H_diff <- tf$math$divide(numerator, denominator)
+        H_diff <- as.numeric(H_diff)
+##        print(H_diff)
+  ##      print(i)
+        if(H_diff  < diff_threshold) {break}
     
     }
-    
-    W <- as.matrix(W_tf)
-    H <- as.matrix(H_tf)
+
+    print(paste(i, "iterations"))
+    W <- as.matrix(W)
+    H <- as.matrix(H)
 
 
     colnames(W) <- paste0("LV",1:k)

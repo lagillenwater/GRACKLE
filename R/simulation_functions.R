@@ -53,6 +53,45 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
   return(g_subgraph)
 }
 
+
+#' old_randomNetwork
+#' #'
+#' #' @description randomNetwork applies igraph functions for creating a random network
+#' #' @importFrom igraph degree.sequence.game
+#' #' @param prior_graph Igraph object of the directed, weighted prior network to model  the simulated network on.
+#' #' @param connected Boolean to determine if the random graph should be directed or not. (Default is TRUE)
+#' #' @param num_nodes Numerical vector representing the size of the graph (Default is 400)
+#' #' @return random graph with similar in and out degree
+#' #' @export
+#' #'
+ old_randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
+    set.seed(42)
+     in_degrees <- degree(prior_graph,mode = "in")
+     out_degrees <- degree(prior_graph,mode = "out")
+     g_length <- 0
+     scale_factor <- 5
+
+     while(g_length <  num_nodes) {
+         g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
+         sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
+         E(g)$weight <- sm
+
+         random_edges <- sample(E(g), num_nodes * scale_factor)
+         g <- subgraph.edges(g, eids = random_edges)
+
+         if(connected){
+           components <- decompose(g)
+
+           g <- components[[which.max(sapply(components, vcount))]]
+         }
+         g_length <- length(V(g))
+         scale_factor <- scale_factor + .1
+    #     (paste0(scale_factor, " : ", g_length))
+     }
+   print(g)
+   return(g)
+ }
+
 #' adjustTransitivity
 #' 
 #' @description adjustTransitivity iteratively rewires the graph to achieve the desired transitivity.
