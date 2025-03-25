@@ -11,11 +11,12 @@
 #' @export
 #' 
 randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
-   # set.seed(42)
+
+    set.seed(1)
     in_degrees <- degree(prior_graph,mode = "in")
     out_degrees <- degree(prior_graph,mode = "out")
     g_diff <- 100
-    scale_factor <- 1
+    scale_factor <- 5
     g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
     sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
     E(g)$weight <- sm
@@ -28,7 +29,7 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
         random_nodes<- sample(V(g), num_nodes * scale_factor)
         g_subgraph <- induced_subgraph(g, vids = random_nodes)
         
-        print(length(V(g_subgraph)))
+        ## print(length(V(g_subgraph)))
         
         if(connected){  
           components <- decompose(g_subgraph)
@@ -47,7 +48,7 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
             scale_factor <- scale_factor - .1
         }
 
-        ## print(scale_factor)
+        print(scale_factor)
         
     }
   return(g_subgraph)
@@ -65,11 +66,11 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
 #' #' @export
 #' #'
  old_randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
-    set.seed(42)
+    set.seed(1)
      in_degrees <- degree(prior_graph,mode = "in")
      out_degrees <- degree(prior_graph,mode = "out")
      g_length <- 0
-     scale_factor <- 5
+    scale_factor <- 4
 
      while(g_length <  num_nodes) {
          g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
