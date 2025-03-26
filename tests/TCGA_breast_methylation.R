@@ -13,8 +13,8 @@ library(devtools)
 load_all()
 
 load("../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
-
 names(metadata) <- make.names(names(as.data.frame(metadata)))
+
 breast_subtype_metadata <- metadata %>%
     as.data.frame() %>%
     select( paper_DNA.Methylation.Clusters) %>%
@@ -39,7 +39,8 @@ expression <- expression %>%
 
 dim(breast_g_adjacency)
 dim(expression)
-results <- list()
+
+load("TCGA_breast_Methylation_to_PAM50_results.RData")
 for ( x in 1:50) {
   
   print(paste("itertion",x))
@@ -56,7 +57,7 @@ for ( x in 1:50) {
    names(grid_search) <- c("lambda_1", "lambda_2")
    grid_search$score <- 0
     total <- ncol(grid_search) * nrow(grid_search)
-    k = 5
+    k = ncol(breast_subtype_metadata)
 
     pam50_clusters <- metadata %>%
         as.data.frame() %>%
@@ -67,6 +68,7 @@ for ( x in 1:50) {
     scores <- lapply( 1:nrow(grid_search), function(i) {
         ## run GRACKLE NMF
 
+        print(i)
         grackle <- GRACKLE(
             Y = dat$train_expression,
             net_similarity = as.matrix(breast_g_adjacency),
@@ -81,7 +83,7 @@ for ( x in 1:50) {
             iterations = 100)
         
         z = 100
-        while(any(is.na(grackle$H)|any(is.infinite(grackle$H)))|(max(grackle$H) - min(grackle$H)) >1e21) {
+        while(any(is.na(grackle$H)|any(is.infinite(grackle$H)))) {
             print(paste("grackle iterations", z))
             z = z-5
             grackle <- GRACKLE(
@@ -146,6 +148,7 @@ for ( x in 1:50) {
 save(results, file = "TCGA_breast_Methylation_to_PAM50_results.RData")
 
 
+
 #### Full data
 pat_sim <- tcrossprod(as.matrix(breast_subtype_metadata))
 min_vals <- apply(expression,2, min) + 1e-10
@@ -153,28 +156,47 @@ max_vals <- apply(expression,2, max)
 ## min-max scale the input matrix
 train_expression  <-as.matrix( min_max_scale(expression,min_vals,max_vals))
 
-k = 5
+k = ncol(breast_subtype_metadata)
 
     
-pam50_clusters <- metadata %>%
-    as.data.frame() %>%
-    filter(rownames(metadata) %in% rownames(expression)) %>%
-    select(paper_BRCA_Subtype_PAM50) 
+pam50_clusters <- breast_subtype_metadata %>%
+    rownames_to_column("sample") %>%
+    pivot_longer(cols = -sample)%>%
+    filter(value ==1) %>%
+    select(-value)
 
-## Top best performing score with graph regularization is lambda_1 = 90, lambda_2 = 2
+
+
 
 grackle <- GRACKLE(
     Y = train_expression,
     net_similarity = as.matrix(breast_g_adjacency),
     patient_similarity = pat_sim,
     diff_threshold = 1e-4,
-    lambda_1 = 90,
-    lambda_2 =2,
+    lambda_1 = 50,
+    lambda_2 =16,
     k = k,
     verbose = F,
     beta = 0,
     error_terms = F,
-    iterations = 100)
+    iterations = 50)
+z = 50
+## correspondence between selected W LV's and top loading gene modules
+while(any(is.na(grackle$H))) {
+    z = z-5
+grackle <- GRACKLE(
+    Y = train_expression,
+    net_similarity = as.matrix(breast_g_adjacency),
+    patient_similarity = pat_sim,
+    diff_threshold = 1e-4,
+    lambda_1 = 50,
+    lambda_2 =16,
+    k = k,
+    verbose = F,
+    beta = 0,
+    error_terms = F,
+    iterations = 50)        
+}
 
 
 rownames(grackle$W) <- rownames(train_expression)
@@ -182,22 +204,20 @@ top <- as.data.frame(apply(grackle$W,1, function(x) which(x == max(x)))) %>%
     rownames_to_column("sample")
 names(top)[2] <-  "top"
 
-
-
-both_clusters <- (pam50_clusters %>% rownames_to_column("sample")) %>%
+both_clusters <- pam50_clusters %>%
     left_join(top, by = "sample")
 
 both_clusters <- both_clusters %>%
     filter(!is.na("top"))
 
-table(both_clusters$paper_BRCA_Subtype_PAM50, both_clusters$top)
+table(both_clusters$name, both_clusters$top)
 
 pam50 <- read.delim("pam50_annotation.txt")
 
 pam50LVs <- grackle$H
-rownames(pam50LVs) <- c("None_1", "None_2", "Basal_Normal", "LumA_LumB", "Basal")
+rownames(pam50LVs) <- c("Basal", "none", "LumA_Normal", "Her2", "LumB")
 colnames(pam50LVs) <- colnames(train_expression)
     
-write.csv(as.data.frame(t(pam50xLVs)), file = "PAM50_gene_LVs_Methylation_sim.csv")
+write.csv(as.data.frame(t(pam50LVs)), file = "PAM50_gene_LVs.csv")
 
-score = ARI(as.factor(both_clusters$paper_BRCA_Subtype_PAM50), as.factor(both_clusters$top))
+score = ARI(as.factor(both_clusters$name), as.factor(both_clusters$top))

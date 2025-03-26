@@ -1,21 +1,18 @@
- ## set seed
-                                        #
-## setwd("~/OneDrive - The University of Colorado Denver/Projects/GRACKLE/")
-##suppressMessages({
-  ##  suppressWarnings({
-#        library(tidyverse)
+
+
+suppressMessages({
+   suppressWarnings({
+       library(tidyverse)
         library(igraph)
         library(devtools)
-  #      library(ggplot2)
- #       library(ComplexHeatmap)
         library(parallel)
         library(optparse)
         load_all()
         library(reticulate)
         use_virtualenv("/mnt/grackle_env")
         library(tensorflow)
-    ##})
-## })
+    })
+})
 
 
                                         # Define the list of options

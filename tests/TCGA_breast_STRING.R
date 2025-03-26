@@ -12,8 +12,6 @@ library(tensorflow)
 library(devtools)
 load_all()
 
-metadata <- read.
-
 load("../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
 
 breast_subtype_metadata <- metadata %>%
@@ -28,11 +26,12 @@ breast_subtype_metadata[is.na(breast_subtype_metadata)] <- 0
 
 
 ## load the graph and expression data
+## load the graph and expression data
+load(file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_STRING_network.RData")
+load(file = "../GRACKLE_data/data/Breast/TCGA/Breast_STRING_filtered_gene_expression_with_PAM50.RData")
 
-load( file = "../GRACKLE_data/data/Breast/TCGA/directed_breast_g_with_PAM50.RData")
-load( file = "../GRACKLE_data/data/Breast/TCGA/Breast_filtered_gene_expression_with_PAM50.RData")
 
-breast_g_adjacency <- as_adjacency_matrix(directed_breast_g_with_PAM50)
+breast_g_adjacency <- net_similarity_filtered
 
 expression <- as.data.frame(t(expression_data))
 tokeep <- colnames(expression)[colnames(expression) %in% colnames(breast_g_adjacency)]
@@ -75,7 +74,8 @@ for ( x in 1:50) {
 
     scores <- lapply( 1:nrow(grid_search), function(i) {
         ## run GRACKLE NMF
-
+        
+##        print(paste("grid search", i))
         grackle <- GRACKLE(
             Y = dat$train_expression,
             net_similarity = as.matrix(breast_g_adjacency),
@@ -134,87 +134,13 @@ for ( x in 1:50) {
     print(paste("top GRACKLE score", max(grid_search %>% filter(scores == max(grid_search$score)) %>% .$score)))
     print(grid_search %>% filter(scores == max(grid_search$score)) )
     
-    nmf_res <- grid_search[1,"score"]
-
     
-    
-    grnmf <- runGRNMF(expression_matrix = dat$train_expression, k = 5, seed = 42, max_iter = 100, alpha = 1)
-    W_test <- project_W(dat$test_expression,grnmf$H,k)
-    top <- as.data.frame(apply(W_test,1, function(x) which(x == max(x)))) %>%
-        rownames_to_column("sample")
-    names(top)[2] <-  "top"
-    both_clusters <- pam50_clusters %>%
-        left_join(top, by = "sample")
-    both_clusters <- both_clusters %>%
-        filter(!is.na("top"))
-    grnmf_res = ARI(as.factor(both_clusters$name), as.factor(both_clusters$top))
-
-    print(paste("NMF score", nmf_res))
-    print(paste("GRNMF score", grnmf_res))
-    
-    results[[x]] <- list(grid_search = grid_search, nmf_res = nmf_res, grnmf_res = grnmf_res)
-
+    results[[x]] <- list(grid_search = grid_search)
+    save(results, file = "TCGA_breast_with_PAM50_results_STRING.RData")
 
 
 }
 
-save(results, file = "TCGA_breast_with_PAM50_results.RData")
 
 
 
-#### Full data
-pat_sim <- tcrossprod(as.matrix(breast_subtype_metadata))
-min_vals <- apply(expression,2, min) + 1e-10
-max_vals <- apply(expression,2, max) 
-## min-max scale the input matrix
-train_expression  <-as.matrix( min_max_scale(expression,min_vals,max_vals))
-
-k = ncol(breast_subtype_metadata)
-
-    
-pam50_clusters <- breast_subtype_metadata %>%
-    rownames_to_column("sample") %>%
-    pivot_longer(cols = -sample)%>%
-    filter(value ==1) %>%
-    select(-value)
-
-
-
-
-grackle <- GRACKLE(
-    Y = train_expression,
-    net_similarity = as.matrix(breast_g_adjacency),
-    patient_similarity = pat_sim,
-    diff_threshold = 1e-4,
-    lambda_1 = 50,
-    lambda_2 =16,
-    k = k,
-    verbose = F,
-    beta = 0,
-    error_terms = F,
-    iterations = 100)
-
-
-
-rownames(grackle$W) <- rownames(train_expression)
-top <- as.data.frame(apply(grackle$W,1, function(x) which(x == max(x)))) %>%
-    rownames_to_column("sample")
-names(top)[2] <-  "top"
-
-both_clusters <- pam50_clusters %>%
-    left_join(top, by = "sample")
-
-both_clusters <- both_clusters %>%
-    filter(!is.na("top"))
-
-table(both_clusters$name, both_clusters$top)
-
-pam50 <- read.delim("pam50_annotation.txt")
-
-pam50LVs <- grackle$H
-rownames(pam50LVs) <- c("Basal", "none", "LumA_Normal", "Her2", "LumB")
-colnames(pam50LVs) <- colnames(train_expression)
-    
-write.csv(as.data.frame(t(pam50LVs)), file = "PAM50_gene_LVs.csv")
-
-score = ARI(as.factor(both_clusters$name), as.factor(both_clusters$top))
