@@ -65,11 +65,10 @@ all_results <- lapply(1:length(results), function(x) {
     k <- results[[x]][[1]]$k
     
     tmp <- data.frame(
-      avg_GRACKLE = unlist(avg_scores),
       top_GRACKLE = unlist(top_scores),
       nmf = unlist(nmf),
-      netnmf = unlist(netnmf),
-     grnmf = unlist(grnmf) 
+      grnmf = unlist(gnmf_result), 
+      netnmf = unlist(netnmf)
     )
    tmp$k = k
    return(tmp)
@@ -77,13 +76,13 @@ all_results <- lapply(1:length(results), function(x) {
 
 
 top_results <- bind_rows(all_results) 
+names(top_results) <- c("GRACKLE", "NMF", "GNMF", "pr-GNMF", "k")
 
 top_results <- top_results %>%
   as.data.frame() %>%
   pivot_longer(cols = -k)
 
-top_results$name <- factor(top_results$name, levels = c("top_GRACKLE", "avg_GRACKLE", "grnmf", "netnmf", "nmf"))
-
+top_results$name <- factor(top_results$name, levels =c("GRACKLE", "NMF", "GNMF", "pr-GNMF", "k"))
 
 
 p1 <- ggplot(top_results, aes(x = as.factor(k), y = value, fill = name)) +
@@ -92,7 +91,7 @@ p1 <- ggplot(top_results, aes(x = as.factor(k), y = value, fill = name)) +
   theme_classic() +
   labs( x= "Rank (k)", y = "Number of enriched conditions") +
   theme(legend.position = "bottom")
-ggsave(p1, file = "../GRACKLE_results/HTP_benchmarking_by_k.pdf", width = 8, height= 4,units = "in")
+ggsave(p1, file = paste0("../GRACKLE_results/HTP_benchmarking_by_k_", Sys.Date(), ".pdf"), width = 8, height= 4,units = "in")
 
 
 # p2 <- ggplot(top_results, aes(x = k, y = value, color = name, group = name)) +
