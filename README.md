@@ -93,7 +93,7 @@ To get started with running simulations, refer to the tutorials provided in the 
 cd tutorials
 ```
 
-Run the tutorial using RStudio or the R console. You will need to change the file paths:
+Run the tutorial using RStudio or the R console. You will need to change the file paths. This tutorial may take significant time to run depending on the size of the data and number of iterations. 
 
 ```R
 rmarkdown::render("simulation_tutorial.Rmd")
