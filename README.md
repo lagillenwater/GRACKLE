@@ -18,8 +18,8 @@ The model is iteratively trained until a stopping criterion of relative change i
 
 ### Prerequisites
 
-*   **R:**  A statistical computing language and environment [7].
-    *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: [7]
+*   **R:**  A statistical computing language and environment.
+    *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: 
         *   `https://cran.r-project.org/`
 
 
