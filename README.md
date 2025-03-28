@@ -4,7 +4,7 @@ Here, we present a novel NMF approach that applies Graph Regulari-zation Across 
 
 A schematic of GRACKLE is shown below. 
 
-<img width="300" alt="image" src="https://github.com/user-attachments/assets/bd3436bb-644b-486b-8f52-034d81ab54ff" />
+<img width="400" alt="image" src="https://github.com/user-attachments/assets/bd3436bb-644b-486b-8f52-034d81ab54ff" />
 
 Before matrix decomposition, the sample metadata is transformed into the sample similarity matrix $$S_S$$ by taking the dot product. Similarly, the gene interactions constitute the gene similarity matrix $$S_G$$. These similarity matrices are used to calculate the graph Laplacians $$L_S$$ and $$L_G$$, which are incorporated into the loss function as,
 
