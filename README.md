@@ -19,12 +19,12 @@ The model is iteratively trained until a stopping criterion of relative change i
 ## Prerequisites
 
 *   **R:**  A statistical computing language and environment.
-    *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: 
-        *   `https://cran.r-project.org/`
+    *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}
 
 ## Download GRACKLE
  **Clone the GRACKLE Repository**:
     To get started, clone the GRACKLE repository from GitHub:
+    
     ```bash
     git clone https://github.com/your-username/GRACKLE.git
     cd GRACKLE
