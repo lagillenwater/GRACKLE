@@ -22,6 +22,13 @@ The model is iteratively trained until a stopping criterion of relative change i
     *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: 
         *   `https://cran.r-project.org/`
 
+*   **Clone the GRACKLE Repository**:
+    To get started, clone the GRACKLE repository from GitHub:
+    ```bash
+    git clone https://github.com/your-username/GRACKLE.git
+    cd GRACKLE
+    ```
+
 ### Installing Required R Packages
 
 To run GRACKLE, ensure you have the following R packages installed. Follow these steps:
@@ -60,5 +67,7 @@ To run GRACKLE, ensure you have the following R packages installed. Follow these
     ```
 
 For more details, refer to the official TensorFlow for R documentation: [TensorFlow for R](https://tensorflow.rstudio.com/).
+
+
 
 
