@@ -16,37 +16,44 @@ $$w_{ik} \leftarrow w_{ik} \times \frac{YH^T + \lambda_1 S_S W}{WHH^T + \lambda_
 
 The model is iteratively trained until a stopping criterion of relative change in $$H$$ is less than $$1 \times 10^{-4}$$ between iterations or a maximum of 100 iterations. These model parameters may be fine tuned based on your scientific question.
 
-### Prerequisites
+## Prerequisites
 
 *   **R:**  A statistical computing language and environment.
     *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: 
         *   `https://cran.r-project.org/`
 
-### Running TensorFlow via R
+### Installing Required R Packages
 
-To use TensorFlow in R, you need to install the `tensorflow` R package and set up the TensorFlow backend. Follow these steps:
+To run GRACKLE, ensure you have the following R packages installed. Follow these steps:
 
-1. **Install the `tensorflow` R package**:
-    Open R and run the following command:
+1. **Install Required Packages**:
+    Open R and run the following commands to install the necessary packages:
     ```R
-    install.packages("tensorflow")
+    install.packages(c("tidyverse", "igraph", "parallel", "optparse", "devtools", "reticulate", "tensorflow"))
     ```
 
-2. **Install TensorFlow**:
+2. **Set Up Python Environment**:
+    GRACKLE uses Python via the `reticulate` package. Ensure you have a virtual environment set up and activate it:
+    ```R
+    library(reticulate)
+    use_virtualenv("/path/to/env")
+    ```
+
+3. **Additional Steps To Install TensorFlow**:
     After installing the `tensorflow` R package, run the following command in R to install TensorFlow:
     ```R
     library(tensorflow)
     install_tensorflow()
     ```
 
-3. **Verify Installation**:
+4. **Verify Installation**:
     To ensure TensorFlow is installed correctly, run:
     ```R
     library(tensorflow)
     tf$constant("Hello, TensorFlow!")
     ```
 
-4. **GPU Support (Optional)**:
+5. **GPU Support (Optional)**:
     If you want to enable GPU support, ensure you have the necessary CUDA and cuDNN libraries installed. Then, install TensorFlow with GPU support:
     ```R
     install_tensorflow(version = "gpu")
