@@ -75,8 +75,6 @@ To run GRACKLE, ensure you have the following R packages installed. Follow these
 
 For more details, refer to the official TensorFlow for R documentation: [TensorFlow for R](https://tensorflow.rstudio.com/).
 
-
-
 ## Simulations
 
 To establish a performance benchmark, we compared GRACKLE to other NMF models using simulated gene expression generated data. The simulated profiles were based on transcription factor (TF)-gene regulatory relationships inferred from breast tissue from GTEx using the Passing Attributes between Networks for Data Assimilation (PANDA) algorithm (Glass et al. 2013; Lonsdale et al. 2013). Gene expression profiles were then simulated using the inferred gene regulatory network as input to the Stochastic Gene Network Simulator (SGNSim) (Ribeiro and Lloyd-Price 2007; Tripathi et al. 2017). In addition, since the aim of GRACKLE is to identify subgroup-specific gene regulatory patterns, we isolated 5 network modules and systematically upregulated genes in these 5 modules in a set of samples to simulate subgroup-specific gene regulatory activation. 
@@ -88,3 +86,15 @@ We assessed the ability of GRACKLE and the other algorithms to decompose the gen
 
 In the simulation studies, we evaluated performance over λ_1 (penalization for sample similarity, S_S) and λ_2 (penalization for gene similarity, S_G) values [0, 1] at an interval of 0.1. We tested GRACKLE over varying levels of background gene expression noise, decreased network modularity, and increased network transitivity (i.e., the percent of graph nodes involved in triangles). We benchmarked GRACKLE against three comparable algorithms: NMF, GNMF, and a prior informed graph regularized NMF inspired by netNMF-sc, which we call pr-GNMF. The NMF model served as a baseline and corresponds to λ_1 =0 and λ_2 =0. For GNMF, the affinity matrix for the gene regularization was calculated with k-nearest neighbors and the λ parameter, which affects the degree of graph regularization, was optimized using the parameters defined by Cai et al. (number of nearest neighbors = 5, λ = [1,10, 10^2, 10^3, 10^4] (Cai et al. 2011) ). For pr-GNMF, the same GRN used for GRACKLE was used for regularization of the gene similarity matrix. For both GNMF and pr-GNMF, graph regularization was performed for the maximum value of λ_2 tested. To avoid overfitting, we calculated the average performance over 100 iterations.
 
+### Running Simulations
+To get started with running simulations, refer to the tutorials provided in the `tutorials` folder. These tutorials include step-by-step instructions and example scripts for simulating data and running GRACKLE. Navigate to the folder and open the relevant RMarkdown or R script:
+
+```bash
+cd tutorials
+```
+
+Run the tutorial using RStudio or the R console. You will need to change the file paths:
+
+```R
+rmarkdown::render("simulation_tutorial.Rmd")
+```
