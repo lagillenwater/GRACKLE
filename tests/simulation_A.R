@@ -1,18 +1,16 @@
 
 
-suppressMessages({
-   suppressWarnings({
-       library(tidyverse)
-        library(igraph)
-        library(devtools)
-        library(parallel)
-        library(optparse)
-        load_all()
-        library(reticulate)
-        use_virtualenv("/mnt/grackle_env")
-        library(tensorflow)
-    })
-})
+
+library(tidyverse)
+library(igraph)
+library(devtools)
+library(parallel)
+library(optparse)
+load_all()
+library(reticulate)
+use_virtualenv("/mnt/grackle_env")
+library(tensorflow)
+
 
 
                                         # Define the list of options

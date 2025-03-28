@@ -22,4 +22,36 @@ The model is iteratively trained until a stopping criterion of relative change i
     *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: 
         *   `https://cran.r-project.org/`
 
+### Running TensorFlow via R
+
+To use TensorFlow in R, you need to install the `tensorflow` R package and set up the TensorFlow backend. Follow these steps:
+
+1. **Install the `tensorflow` R package**:
+    Open R and run the following command:
+    ```R
+    install.packages("tensorflow")
+    ```
+
+2. **Install TensorFlow**:
+    After installing the `tensorflow` R package, run the following command in R to install TensorFlow:
+    ```R
+    library(tensorflow)
+    install_tensorflow()
+    ```
+
+3. **Verify Installation**:
+    To ensure TensorFlow is installed correctly, run:
+    ```R
+    library(tensorflow)
+    tf$constant("Hello, TensorFlow!")
+    ```
+
+4. **GPU Support (Optional)**:
+    If you want to enable GPU support, ensure you have the necessary CUDA and cuDNN libraries installed. Then, install TensorFlow with GPU support:
+    ```R
+    install_tensorflow(version = "gpu")
+    ```
+
+For more details, refer to the official TensorFlow for R documentation: [TensorFlow for R](https://tensorflow.rstudio.com/).
+
 
