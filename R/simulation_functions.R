@@ -319,7 +319,8 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
 #' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @return data frame of simulated gene expression data
 #' @export
-parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = .3) {
+parallelSimulateExpression <- function(g,max_expression = 2000, num_samples= 5, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5,noise_constant = NULL) {
+  num_cores <- detectCores() - 1
   res <- mclapply(1:num_samples, function(x) {
     simulateExpression(g,max_expression, iterations, rc, select_nodes , perturbation_constant, noise_constant)
   }, mc.cores = 2)
