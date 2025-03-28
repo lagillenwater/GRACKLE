@@ -9,7 +9,7 @@ library(reticulate)
 use_virtualenv("/mnt/grackle_env")
 library(tensorflow)
 
-# Load breast graph data
+# Load the preprocessed breast network
 breast_graph <- get(load("../GRACKLE_data/data/breast_igraph_prob_1_cor_0_05.RData"))
 
 # Define parameters
