@@ -14,4 +14,12 @@ where $$\lambda_1$$ and $$\lambda_2$$ are tuning parameters for graph regulariza
 
 $$w_{ik} \leftarrow w_{ik} \times \frac{YH^T + \lambda_1 S_S W}{WHH^T + \lambda_1 D_S W}, \quad h_{jk} \leftarrow h_{jk} \times \frac{W^T Y + \lambda_2 S_G H}{HWW^T + \lambda_2 D_G H} \quad $$
 
-The model is iteratively trained until a stopping criterion of relative change in $$H$$ is less than $$1 \times 10^{-4}$$ between iterations or a maximum of 100 iterations.
+The model is iteratively trained until a stopping criterion of relative change in $$H$$ is less than $$1 \times 10^{-4}$$ between iterations or a maximum of 100 iterations. These model parameters may be fine tuned based on your scientific question.
+
+### Prerequisites
+
+*   **R:**  A statistical computing language and environment [7].
+    *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}: [7]
+        *   `https://cran.r-project.org/`
+
+
