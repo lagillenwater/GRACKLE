@@ -1,0 +1,184 @@
+---
+title: "GRACKLE Simulation Tutorial"
+author: "GRACKLE Team"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This tutorial demonstrates how to simulate gene expression data and evaluate the GRACKLE model using a preprocessed breast network. The steps include generating random graphs, adjusting transitivity, adding noise, and performing GRACKLE grid search.
+
+## Load Required Libraries
+
+```{r load-libraries}
+library(tidyverse)
+library(igraph)
+library(devtools)
+library(parallel)
+library(optparse)
+load_all()
+library(reticulate)
+use_virtualenv("/mnt/grackle_env")
+library(tensorflow)
+```
+
+## Load Preprocessed Breast Network
+
+```{r load-network}
+breast_graph <- get(load("../GRACKLE_data/data/breast_igraph_prob_1_cor_0_05.RData"))
+```
+
+## Define Parameters
+
+```{r define-parameters}
+noise_sequence <- seq(0.3, 0.7, 0.2)
+transitivity_sequence <- c(0, seq(0.1, 0.3, 0.1))
+num_nodes <- 400
+num_groups <- 5
+num_per_group <- 20
+```
+
+## Generate or Load Random Graph
+
+```{r random-graph}
+random_graph_file <- paste0(
+  "../GRACKLE_results/small_simulation_A/random_graph_", num_nodes, "nodes.RData"
+)
+
+if (file.exists(random_graph_file)) {
+  message("Loading random graph")
+  load(random_graph_file)
+} else {
+  message("Generating random graph")
+  random_graph <- old_randomNetwork(prior_graph = breast_graph, num_nodes = num_nodes)
+  save(random_graph, file = random_graph_file)
+}
+```
+
+## Adjust Transitivity and Cluster Network
+
+```{r adjust-transitivity}
+for (transitivity in transitivity_sequence) {
+  message(paste("Transitivity sequence:", transitivity))
+  
+  if (transitivity == 0) {
+    adjusted_graph <- random_graph
+  } else {
+    adjusted_graph <- adjustTransitivity(random_graph, target_transitivity = transitivity)
+  }
+  
+  network_transitivity <- transitivity(as.undirected(adjusted_graph), weights = NA)
+  message(paste("Network transitivity:", network_transitivity))
+  
+  set.seed(42)
+  clusters <- cluster_louvain(as.undirected(adjusted_graph), weights = NA)
+  membership <- clusters$membership
+  membership_counts <- table(as.factor(membership))
+  print(membership_counts)
+  
+  large_clusters <- names(membership_counts[order(membership_counts, decreasing = TRUE)][1:5])
+  network_modularity <- round(modularity(clusters), 4)
+  message(paste("Prior network modularity:", network_modularity))
+}
+```
+
+## Simulate Noisy Expression Data
+
+```{r simulate-expression}
+noisy_expression_file <- paste0(
+  "../GRACKLE_results/small_simulation_A/data/noisy_simulations_num_nodes_",
+  num_nodes, "_num_groups_", num_groups, "_per_group_", num_per_group, "_t_", transitivity, ".RData"
+)
+
+if (file.exists(noisy_expression_file)) {
+  message("Loading noisy expression")
+  load(noisy_expression_file)
+} else {
+  set.seed(42)
+  message("Creating noisy expression")
+  noisy_expression <- lapply(noise_sequence, function(noise) {
+    simulated_expression <- mclapply(large_clusters, function(cluster) {
+      parallelSimulateExpression(
+        random_graph, iterations = 3, max_expression = 100,
+        num_samples = num_per_group, select_nodes = which(membership == cluster),
+        perturbation_constant = 2.8, noise_constant = noise
+      )
+    }, mc.cores = 8)
+    
+    simulated_expression <- lapply(simulated_expression, as.data.frame)
+    combined_expression <- do.call(rbind, simulated_expression)
+    rownames(combined_expression) <- paste0("sample", seq_len(nrow(combined_expression)))
+    combined_expression
+  })
+  
+  names(noisy_expression) <- noise_sequence
+  metadata <- simulateMetadata(
+    group_size = rep(num_per_group, num_groups),
+    group_labels = paste0("subgroup", seq_len(num_groups)),
+    row_names = paste0("sample", seq_len(nrow(noisy_expression[[1]])))
+  )
+  
+  message("Saving noisy expression")
+  save(noisy_expression, metadata, file = noisy_expression_file)
+}
+```
+
+## Perform GRACKLE Grid Search
+
+```{r grackle-grid-search}
+lambda_1_sequence <- seq(0, 1, 0.1)
+lambda_2_sequence <- seq(0, 1, 0.1)
+grid_search <- expand.grid(lambda_1 = lambda_1_sequence, lambda_2 = lambda_2_sequence)
+grid_search$score <- 0
+
+message("GRACKLE grid search ...")
+scores <- lapply(seq_len(nrow(grid_search)), function(i) {
+  grackle <- GRACKLE(
+    Y = noisy_expression[[1]],  # Example using the first noise level
+    net_similarity = as.matrix(as_adjacency_matrix(adjusted_graph)),
+    patient_similarity = as.matrix(metadata) %*% t(metadata),
+    diff_threshold = 1e-4,
+    lambda_1 = grid_search$lambda_1[i],
+    lambda_2 = grid_search$lambda_2[i],
+    k = num_groups,
+    verbose = FALSE,
+    error_terms = FALSE,
+    beta = 0,
+    iterations = 100
+  )
+  
+  evaluationWrapper(
+    test_expression = noisy_expression[[1]],  # Example using the first noise level
+    test_metadata = metadata,
+    H_train = grackle$H,
+    k = num_groups,
+    clusters = clusters,
+    aligned_clusters = large_clusters
+  )
+})
+
+grid_search$score <- unlist(scores)
+message(paste("Avg GRACKLE score:", round(mean(grid_search$score), 3)))
+message(paste("Top GRACKLE score:", max(grid_search$score)))
+```
+
+## Save Results
+
+```{r save-results}
+simulation_results_file <- paste0(
+  "../GRACKLE_results/small_simulation_A/updated_simulation_results_num_nodes_",
+  num_nodes, "_num_groups_", num_groups, "_num_samples_", num_per_group,
+  "_t_", transitivity, "_m_", modularity, ".RData"
+)
+message(paste("Saving", simulation_results_file))
+save(grid_search, file = simulation_results_file)
+```
+
+## Conclusion
+
+This tutorial demonstrated the steps to simulate gene expression data, adjust network properties, and evaluate the GRACKLE model. Modify the parameters as needed for your specific use case.
