@@ -40,28 +40,34 @@ To run GRACKLE, ensure you have the following R packages installed. Follow these
     install.packages(c("tidyverse", "igraph", "parallel", "optparse", "devtools", "reticulate", "tensorflow"))
     ```
 
-2. **Set Up Python Environment**:
+2. **Install `sgnesR` from GitHub**:
+    The `sgnesR` package is required for simulating gene expression data. Install it using the following command:
+    ```R
+    devtools::install_github("shaileshtripathi/sgnesR")
+    ```
+
+3. **Set Up Python Environment**:
     GRACKLE uses Python via the `reticulate` package. Ensure you have a virtual environment set up and activate it:
     ```R
     library(reticulate)
     use_virtualenv("/path/to/env")
     ```
 
-3. **Additional Steps To Install TensorFlow**:
+4. **Additional Steps To Install TensorFlow**:
     After installing the `tensorflow` R package, run the following command in R to install TensorFlow:
     ```R
     library(tensorflow)
     install_tensorflow()
     ```
 
-4. **Verify Installation**:
+5. **Verify Installation**:
     To ensure TensorFlow is installed correctly, run:
     ```R
     library(tensorflow)
     tf$constant("Hello, TensorFlow!")
     ```
 
-5. **GPU Support (Optional)**:
+6. **GPU Support (Optional)**:
     If you want to enable GPU support, ensure you have the necessary CUDA and cuDNN libraries installed. Then, install TensorFlow with GPU support:
     ```R
     install_tensorflow(version = "gpu")
@@ -80,5 +86,5 @@ We assessed the ability of GRACKLE and the other algorithms to decompose the gen
 <img width="500" alt="image" src="https://github.com/user-attachments/assets/19529211-503c-4dfc-aab9-d944802b3b07" />
 
 
-In the simulation studies, we evaluated performance over λ_1 (penalization for sample similarity, S_S) and λ_2 (penalization for gene similarity, S_G) values [0, 1] at an interval of 0.1. We tested GRACKLE over varying levels of background gene expression noise, decreased network modularity, and increased network transitivity (i.e., the percent of graph nodes involved in triangles). We benchmarked GRACKLE against three comparable algorithms: NMF, GNMF, and a prior informed graph regularized NMF inspired by netNMF-sc, which we call pr-GNMF. The NMF model served as a baseline and corresponds to λ_1 =0 and λ_2 =0. For GNMF, the affinity matrix for the gene regularization was calculated with k-nearest neighbors and the λ parameter, which affects the degree of graph regularization, was optimized using the parameters defined by Cai et al. (number of nearest neighbors = 5, λ = [1,10, 10^2, 10^3, 10^4] (Cai et al. 2011) ). For pr-GNMF, the same GRN used for GRACKLE was used for regularization of the gene similarity matrix. For both GNMF and pr-GNMF, graph regularization was performed for the maximum value of λ_2 tested. To avoid overfitting, we calculated the average performance over 100 iterations. 
+In the simulation studies, we evaluated performance over λ_1 (penalization for sample similarity, S_S) and λ_2 (penalization for gene similarity, S_G) values [0, 1] at an interval of 0.1. We tested GRACKLE over varying levels of background gene expression noise, decreased network modularity, and increased network transitivity (i.e., the percent of graph nodes involved in triangles). We benchmarked GRACKLE against three comparable algorithms: NMF, GNMF, and a prior informed graph regularized NMF inspired by netNMF-sc, which we call pr-GNMF. The NMF model served as a baseline and corresponds to λ_1 =0 and λ_2 =0. For GNMF, the affinity matrix for the gene regularization was calculated with k-nearest neighbors and the λ parameter, which affects the degree of graph regularization, was optimized using the parameters defined by Cai et al. (number of nearest neighbors = 5, λ = [1,10, 10^2, 10^3, 10^4] (Cai et al. 2011) ). For pr-GNMF, the same GRN used for GRACKLE was used for regularization of the gene similarity matrix. For both GNMF and pr-GNMF, graph regularization was performed for the maximum value of λ_2 tested. To avoid overfitting, we calculated the average performance over 100 iterations.
 
