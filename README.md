@@ -22,13 +22,13 @@ The model is iteratively trained until a stopping criterion of relative change i
     *   Download and install the latest version of R from {Link: CRAN https://cran.r-project.org/}
 
 ## Download GRACKLE
- **Clone the GRACKLE Repository**:
-    To get started, clone the GRACKLE repository from GitHub:
-    
-    ```bash
-    git clone https://github.com/your-username/GRACKLE.git
-    cd GRACKLE
-    ```
+**Clone the GRACKLE Repository**:
+To get started, clone the GRACKLE repository from GitHub:
+
+```bash
+git clone https://github.com/your-username/GRACKLE.git
+cd GRACKLE
+```
 
 ## Install Required R Packages
 
