@@ -87,10 +87,11 @@ GRACKLE <- function(
     H_tf <- tf$convert_to_tensor(H, dtype = tf$float64)
 
     for(i in 1:iterations) {
-        ##   H_diff <- 1
-                                        #    while(H_diff > diff_threshold) {
-        ##         oldH <- H
-        ##          oldH_tf <- H_tf
+    
+        ##   H_diff <- 1        
+#    while(H_diff > diff_threshold) {
+##         oldH <- H
+##          oldH_tf <- H_tf
         ## Iteratively update matrices
         ## W <- W *  ((tcrossprod(Y,H) + lambda_1 * patient_similarity %*% W   )  / (W%*% tcrossprod(H, H) + lambda_1 * D_p %*%W))
         ## W <- apply(W,2,function(x) scale(x,center = F))
@@ -107,7 +108,6 @@ GRACKLE <- function(
         ## H_tf_transposed <- tf$transpose(H_tf)
         ## H_tf_scaled_transposed <- tf$map_fn(scale_without_centering, H_tf_transposed, dtype = tf$float64)
         ## H_tf <- tf$transpose(H_tf_scaled_transposed)
-                                        # Calculate the difference
         ##  diff <- tf$subtract(H_tf, oldH_tf)
         ##                                 # Calculate the numerator: sum((H - oldH)^2)
         ##  numerator <- tf$reduce_sum(tf$square(diff))
@@ -117,9 +117,9 @@ GRACKLE <- function(
         ## H_diff <- tf$math$divide(numerator, denominator)
         ## H_diff <- as.numeric(H_diff)
         ## print(H_diff)
-
+    
     }
-
+    
     W <- as.matrix(W_tf)
     H <- as.matrix(H_tf)
 
@@ -199,5 +199,3 @@ colScale = function(x,
 ## matMult <- function(A,B) {
 ##     .Call('_GRACKLE_matMult', PACKAGE = 'GRACKLE', A, B)
 ## }
-
-

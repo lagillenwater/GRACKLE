@@ -1,6 +1,0 @@
-library(igraph)
-
-
-load("./data/Breast/directed_breast_igraph.RData")
-
-summary(breast_g)
