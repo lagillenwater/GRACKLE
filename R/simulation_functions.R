@@ -10,13 +10,13 @@
 #' @return random graph with similar in and out degree
 #' @export
 #' 
-randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
+randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400, seed = seed){
 
-    set.seed(1)
+    ##set.seed(seed)
     in_degrees <- degree(prior_graph,mode = "in")
     out_degrees <- degree(prior_graph,mode = "out")
     g_diff <- 100
-    scale_factor <- 5
+    scale_factor <- 1
     g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
     sm <- sample(E(prior_graph)$weight, ecount(g), rep = FALSE)
     E(g)$weight <- sm
@@ -48,7 +48,7 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
             scale_factor <- scale_factor - .1
         }
 
-        print(scale_factor)
+        ## print(scale_factor)
         
     }
   return(g_subgraph)
@@ -65,12 +65,12 @@ randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
 #' #' @return random graph with similar in and out degree
 #' #' @export
 #' #'
- old_randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
-    set.seed(1)
+old_randomNetwork <- function(prior_graph, connected = TRUE, num_nodes = 400){
+    set.seed(42)
      in_degrees <- degree(prior_graph,mode = "in")
      out_degrees <- degree(prior_graph,mode = "out")
      g_length <- 0
-    scale_factor <- 4
+    scale_factor <- 5
 
      while(g_length <  num_nodes) {
          g <- degree.sequence.game(out_degrees, in_degrees, method = "simple")
@@ -209,27 +209,14 @@ networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
   
   while(current_modularity > goal_modularity) {
 
-      old_edge <- sample(E(graph),1)
-      graph <- delete_edges(graph, old_edge)
+      ## old_edge <- sample(E(graph),1)
+      ## graph <- delete_edges(graph, old_edge)
     new_edge <- sample(V(graph), 2)
     graph <- add_edges(graph, new_edge)
     E(graph)[length(E(graph))]$weight  <- sample(weights,1)
     
-    # for(i in large_clusters) {
-    #   # print(i)
-    #   community_nodes <- which(membership == i)
-    #   community_edges <- E(graph)[.inc(V(graph)[community_nodes])]
-    #   rand_edge <- sample(1:length(community_edges),1)
-    #   rand_nodes <- c(ends(graph, community_edges[rand_edge]))
-    #   community_edge <- get.edge.ids(graph, rand_nodes)
-    #   graph <- delete_edges(graph, community_edge)
-    #   
-    #   graph <- add_edges(graph,c(rand_nodes[1], sample(which(membership != i),1)))
-    #               
-    # 
-    # }
     current_modularity <- modularity(cluster_louvain(as.undirected(graph),weights = NA))
-   #  print(current_modularity)
+     print(current_modularity)
   }
   return(graph)
 }

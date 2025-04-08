@@ -12,7 +12,6 @@ library(tensorflow)
 library(devtools)
 load_all()
 
-metadata <- read.
 
 load("../GRACKLE_data/data/Breast/TCGA/Breast_metadata.RData")
 
@@ -75,7 +74,7 @@ for ( x in 1:50) {
 
     scores <- lapply( 1:nrow(grid_search), function(i) {
         ## run GRACKLE NMF
-
+        print(i)
         grackle <- GRACKLE(
             Y = dat$train_expression,
             net_similarity = as.matrix(breast_g_adjacency),

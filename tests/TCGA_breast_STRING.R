@@ -119,7 +119,10 @@ for ( x in 1:50) {
             return(score)
    })
 
+
     grid_search$score <- unlist(scores)
+
+    
 
     ## nmf <- runNMF(dat$train_expression,k, "lee", seed = 42)
      ## ## correspondence between selected W LV's and top loading gene modules
