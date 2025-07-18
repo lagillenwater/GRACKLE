@@ -26,7 +26,7 @@ The model is iteratively trained until a stopping criterion of relative change i
 To get started, clone the GRACKLE repository from GitHub:
 
 ```bash
-git clone https://github.com/your-username/GRACKLE.git
+git clone https://github.com/lagillenwater/GRACKLE.git
 cd GRACKLE
 ```
 
