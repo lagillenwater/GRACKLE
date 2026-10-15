@@ -106,7 +106,7 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
 - **STRING v12** (`9606.protein.links.full.v12.0.txt`, `9606.protein.links.v12.0.txt`, `9606.protein.aliases.v12.0.txt`). The full-links file carries the per-channel scores.
 - **DepMap** (one pinned public release): `CRISPRGeneEffect` (Chronos), model metadata (growth pattern, HCMI identifiers), the non-essential control gene list, and the NextGen 3D screens.
 - **Sanger HCMI organoid CRISPR screens** (Herranz-Ors et al. 2026), from their deposited gene-level scores.
-- **Gene annotation:** HGNC complete set (the pinned 2024-10-01 file `ensemblToHGNC` already uses), GENCODE v36 gene coordinates (the GDC STAR annotation), and UCSC hg38 `cytoBand` for chromosome arms.
+- **Gene annotation:** HGNC complete set, the pinned 2024-10-01 file `ensemblToHGNC` already uses. It supplies symbols, Ensembl and Entrez IDs, and the cytogenetic `location` used for chromosome arms.
 - **MSigDB Hallmark** via `msigdbr`, with the package version pinned and the gene sets cached as an RDS file.
 
 ### 4.2 Sample table (`02_sample_table.R`)
@@ -160,7 +160,7 @@ Four arms, each a single source, all over the final gene set:
    - 3D: organoid and spheroid screens. If DepMap NextGen and Sanger scores cannot be put on one scale (checked at implementation), use the larger source alone. For each fold, the screens of models from that fold's held-out cases are removed before the graph is built. The reference fit uses all 3D screens.
 2. **Informative genes.** A gene gets edges only if the SD of its Chronos scores across the arm's models exceeds the 95th percentile of SDs among DepMap's non-essential control genes. Without this filter, the nearest-neighbor step would give noise-only genes random edges.
 3. **Nuisance correction.** GLS whitening across models (Wainberg et al. 2021, *Nat Genet*): estimate the model-by-model covariance from all genes and whiten the model dimension by its inverse square root. This removes shared line-level structure such as screen quality and proliferation.
-4. **Similarity.** Pearson correlation between informative genes' whitened profiles. Pairs on the same chromosome arm (GENCODE v36 coordinates, UCSC `cytoBand`) are set to 0 to remove CRISPR proximity artifacts. Negative values are set to 0.
+4. **Similarity.** Pearson correlation between informative genes' whitened profiles. Pairs on the same chromosome arm are set to 0 to remove CRISPR proximity artifacts; the arm comes from the cytogenetic `location` field of the pinned HGNC file (e.g., `17q21.31` gives `17q`). Negative values are set to 0.
 5. **Sparsify.** Keep each gene's 10 nearest neighbors among the final genes, with weight equal to the correlation, symmetrized with `pmax(S, t(S))`.
 
 **`string_mech`.**
@@ -168,7 +168,7 @@ Four arms, each a single source, all over the final gene set:
   1. For each channel, `s' = max(0, (s / 1000 - 0.041) / (1 - 0.041))`.
   2. Combine: `c = 1 - prod(1 - s')`.
   3. Add the prior back: `c * (1 - 0.041) + 0.041`.
-- **Unit-tested:** recombining all channels with the same procedure, including STRING's homology correction of the text-mining and neighborhood channels, reproduces `combined_score` (to within 1 on the 0-1000 scale).
+- **Unit-tested:** recombining all channels with the same procedure reproduces `combined_score` (to within 1 on the 0-1000 scale). For this test, direct and transferred scores are combined per channel, and the co-occurrence and text-mining channels get STRING's homology correction.
 - Weight = recombined score; no threshold.
 
 **`string_all`.**
@@ -286,7 +286,7 @@ Sections 8.1-8.3 run identically within each of the four gene-graph arms (Sectio
 For each stable program j, the inputs are the held-out pairs (t, o) from every fold, each using the fold program matched to j.
 
 **Concordance.**
-- **Statistic:** rank tumor activities and organoid activities separately within cancer type (pooled across folds), center the ranks, and take the Pearson correlation of the pooled centered ranks. This is a stratified Spearman correlation.
+- **Statistic:** rank tumor activities and organoid activities separately within cancer type (pooled across folds). Convert to normalized centered ranks, `(rank - (n + 1) / 2) / n` with n the type's pair count, so each type is weighted by its number of pairs. Take the Pearson correlation of the pooled values. This is a stratified Spearman correlation. If either side has zero variance (for example, all NNLS activities are 0), the statistic is 0 and p = 1.
 - **Null:** 10,000 permutations that shuffle organoids among tumors **within cancer type x fold strata**.
 - **P-value:** one-sided, `p = (1 + #{null >= obs}) / (1 + 10000)`.
 - **Confidence interval:** 95% percentile, from 2,000 bootstrap resamples of pairs within strata.
@@ -394,7 +394,7 @@ These conventions follow fm-pm-evaluator (`scripts/alpine/ralpine`, `docs/PROCES
   - Once the branch is pushed, the user runs this once: `git -C /projects/$USER/repositories/GRACKLE fetch origin && git -C /projects/$USER/repositories/GRACKLE worktree add ../GRACKLE-organoid-transfer organoid-transfer`.
 - **Deployment** is git-only: `git push`, then `ralpine update`, then `ralpine submit`. `submit` refuses when Alpine's HEAD differs from local HEAD.
 - **Environment**
-  - `setup_env.sbatch` fetches a standalone micromamba binary and builds `/projects/$USER/software/envs/grackle` from the committed `environment.yml` (conda-forge: `r-base`, `r-reticulate`, `r-tensorflow`, CPU `tensorflow`, `r-igraph`, `r-nnls`, `r-cluster`, `r-clue`, `r-irlba`, `r-msigdbr`, `r-tidyestimate`, `r-devtools`, `r-testthat`, `r-jsonlite`, `r-httr2`, `r-tidyverse`).
+  - `setup_env.sbatch` fetches a standalone micromamba binary and builds `/projects/$USER/software/envs/grackle` from the committed `environment.yml` (conda-forge: `r-base`, `r-reticulate`, `r-tensorflow`, `tensorflow-cpu`, `r-igraph`, `r-nnls`, `r-cluster`, `r-clue`, `r-irlba`, `r-data.table`, `r-msigdbr`, `r-glmnet`, `r-fnn`, `r-ppcor`, `r-devtools`, `r-testthat`, `r-jsonlite`, `r-httr2`, `r-tidyverse`). `tidyestimate` is not on conda-forge, so it is installed from CRAN at a pinned version (1.1.1) inside the environment.
   - It writes `environment.lock.txt` (an explicit export), which is committed.
   - `scripts/alpine/env.sh` puts the environment's `bin/` on `PATH`; `module load anaconda` fails inside batch jobs.
 - **Jobs**
@@ -450,7 +450,14 @@ environment.yml, environment.lock.txt
 tests/testthat.R, tests/testthat/
 ```
 
-New exported functions get roxygen documentation, and `NAMESPACE` and `man/` are regenerated with `devtools::document()`. New package dependencies (`cluster`, `clue`, `irlba`, `msigdbr`, `tidyestimate`, `jsonlite`, `httr2`) are added to `DESCRIPTION`.
+New exported functions get roxygen documentation, and `NAMESPACE` and `man/` are regenerated with `devtools::document()`.
+
+**Package loadability fix**, required for any clean environment:
+- `PLIER`, `sgnesR` and `NMF` move from `@import` to `Suggests`, called with `pkg::` behind `requireNamespace()` checks. `PLIER` and `sgnesR` are GitHub-only, and `NMF` pulls in Bioconductor.
+- The unused `@import dynutils` is removed.
+- `@useDynLib GRACKLE`, `LinkingTo: Rcpp` and `R/RcppExports.R` are removed. That file calls compiled code, and there is no `src/` directory.
+
+New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `jsonlite`. New `Suggests`: `tidyestimate`, `testthat (>= 3.0.0)`, `withr`.
 
 ---
 
