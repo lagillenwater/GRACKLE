@@ -62,6 +62,7 @@ if (args$stage == "sensitivity") {
     sub <- Filter(function(r) r$meta$k_mult == km, results)
     expected <- unique(tasks[tasks$k_mult == km, c("setting_id", "alpha_1", "alpha_2")])
     d <- file.path(res_dir, args$arm, sprintf("sensitivity_k%s", km))
+    unlink(d, recursive = TRUE)   # one outcome per run: an earlier ERROR.txt or result never survives
     out <- tryCatch(combineArm(sub, expected, samples, pairs, gene_sets, mut, est, n_perm = np, n_boot = nb,
                                n_perm_match = nm, seed = cfg$seed, cores = cores),
                     error = function(e) { dir.create(d, recursive = TRUE, showWarnings = FALSE)
