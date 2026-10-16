@@ -69,3 +69,12 @@ test_that("collapseScreens averages repeat screens of a model", {
   expect_equal(unname(out[, "ACH-1"]), c(2, 3.5))   # SC-1 = (1, 2), SC-2 = (3, 5)
   expect_equal(unname(out[, "ACH-2"]), c(7, 9))
 })
+
+test_that("dropUnidentifiedModels drops models absent from every model table", {
+  E <- matrix(1:6, 2, dimnames = list(c("A1BG", "KRAS"), c("ACH-1", "ACH-2", "ACH-9")))
+  out <- dropUnidentifiedModels(E, c("ACH-1", "ACH-2", "ACH-5"))
+  expect_equal(colnames(out$effect), c("ACH-1", "ACH-2"))
+  expect_equal(out$effect["KRAS", "ACH-2"], 4L)
+  expect_equal(out$dropped, "ACH-9")
+  expect_equal(dropUnidentifiedModels(E, colnames(E))$dropped, character(0))
+})

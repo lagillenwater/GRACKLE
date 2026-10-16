@@ -40,6 +40,12 @@ cls <- screenClass(colnames(E_ng), ng_screens, ng_models)
 fwrite(cls, file.path(cfg$processed, "depmap_screen_classes.csv"))
 E_ng2 <- collapseScreens(E_ng[, cls$class == "2D", drop = FALSE], cls$model_id[cls$class == "2D"])
 E3_dm <- collapseScreens(E_ng[, cls$class == "3D", drop = FALSE], cls$model_id[cls$class == "3D"])
+## A model in no model table cannot be checked for HCMI origin, so it is dropped (ledger, Task 22).
+known_models <- unique(unlist(lapply(model_tables, `[[`, "ModelID")))
+id2 <- dropUnidentifiedModels(E_ng2, known_models); E_ng2 <- id2$effect
+id3 <- dropUnidentifiedModels(E3_dm, known_models); E3_dm <- id3$effect
+message("models in no model table, dropped: 2D ", length(id2$dropped), ", 3D ", length(id3$dropped),
+        if (length(id3$dropped)) paste0(" (", paste(id3$dropped, collapse = ", "), ")"))
 if (ncol(E_ng2) >= 1000) {
   E2 <- E_ng2
   source_2d <- sprintf("NextGen manuscript run, shared with 3D (%d traditional models)", ncol(E_ng2))
@@ -74,7 +80,8 @@ invisible(lapply(0:5, function(f) {
   Ef <- dropHeldOutModels(E3, model_case, held)
   G3 <- coessGraph(Ef, genes, nonessential, arm)
   saveRDS(G3, file.path(gg_dir, sprintf("coess_3d_fold%d.rds", f)))
-  record("coess_3d", f, G3, ncol(Ef), length(informativeGenes(Ef, nonessential)), combined_3d$decision)
+  record("coess_3d", f, G3, ncol(Ef), length(informativeGenes(Ef, nonessential)),
+         sprintf("%s; %d unidentified DepMap 3D models dropped", combined_3d$decision, length(id3$dropped)))
 }))
 fwrite(rbindlist(summ, fill = TRUE), file.path(cfg$processed, "gene_graph_summary.csv"))
 writeProvenance(file.path(cfg$processed, "gene_graph_summary.csv"),

@@ -119,3 +119,17 @@ collapseScreens <- function(effect, model_id) {
   out <- vapply(groups, function(i) rowMeans(effect[, i, drop = FALSE], na.rm = TRUE), numeric(nrow(effect)))
   matrix(out, nrow = nrow(effect), dimnames = list(rownames(effect), names(groups)))
 }
+
+#' dropUnidentifiedModels
+#'
+#' Drops gene-effect columns whose model is absent from every model table. Such a model cannot be
+#' checked for HCMI origin, so keeping it could leak a held-out patient's organoid into a fold's
+#' co-essentiality graph.
+#' @param effect Genes x models matrix.
+#' @param known Model ids present in at least one model table.
+#' @return A list with `effect` (the identified columns) and `dropped` (the removed model ids).
+#' @export
+dropUnidentifiedModels <- function(effect, known) {
+  keep <- colnames(effect) %in% known
+  list(effect = effect[, keep, drop = FALSE], dropped = colnames(effect)[!keep])
+}
