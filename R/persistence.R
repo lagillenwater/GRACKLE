@@ -18,12 +18,16 @@ concordanceStat <- function(zt, zo) {
   stats::cor(zt, zo)
 }
 
+## Levels in byte order, so the order in which groups take seeded draws does not depend on the
+## collation locale. A factor keeps the level order its caller chose.
+radixFactor <- function(x) if (is.factor(x)) x else factor(x, levels = unique(sort(x, method = "radix")))
+
 #' permuteWithin
 #' @param strata Grouping vector.
 #' @return Permuted indices that only move positions within a stratum. A size-one stratum stays fixed.
 #' @export
 permuteWithin <- function(strata) {
-  groups <- split(seq_along(strata), strata)
+  groups <- split(seq_along(strata), radixFactor(strata))
   out <- seq_along(strata)
   out[unlist(groups, use.names = FALSE)] <- unlist(lapply(groups, function(i) i[sample.int(length(i))]), use.names = FALSE)
   out
@@ -34,7 +38,7 @@ permuteWithin <- function(strata) {
 #' @return Bootstrap indices drawn with replacement within each stratum.
 #' @export
 resampleWithin <- function(strata) {
-  groups <- split(seq_along(strata), strata)
+  groups <- split(seq_along(strata), radixFactor(strata))
   unlist(lapply(groups, function(i) i[sample.int(length(i), replace = TRUE)]), use.names = FALSE)
 }
 
@@ -53,7 +57,7 @@ persistenceConcordance <- function(pairs, n_perm = 10000, n_boot = 2000, seed = 
   zt <- normRankWithin(pairs$tumor_act, pairs$cancer_type)
   zo <- normRankWithin(pairs$organoid_act, pairs$cancer_type)
   obs <- concordanceStat(zt, zo)
-  strata <- interaction(pairs$cancer_type, pairs$fold, drop = TRUE)
+  strata <- interaction(radixFactor(pairs$cancer_type), pairs$fold, drop = TRUE)
   draws <- withr::with_seed(seed, list(
     null = vapply(seq_len(n_perm), function(b) concordanceStat(zt, zo[permuteWithin(strata)]), numeric(1)),
     boot = vapply(seq_len(n_boot), function(b) {
@@ -86,7 +90,7 @@ persistenceRetention <- function(pairs, n_perm = 10000, n_boot = 2000, seed = 1)
   eps <- if (length(nz)) unname(stats::quantile(nz, 0.01)) else 1e-8
   lr <- log2((pairs$organoid_act + eps) / (pairs$tumor_act + eps))
   obs <- stats::median(lr)
-  strata <- interaction(pairs$cancer_type, pairs$fold, drop = TRUE)
+  strata <- interaction(radixFactor(pairs$cancer_type), pairs$fold, drop = TRUE)
   draws <- withr::with_seed(seed, list(
     null = vapply(seq_len(n_perm), function(b) stats::median(lr * sample(c(-1, 1), length(lr), replace = TRUE)), numeric(1)),
     boot = vapply(seq_len(n_boot), function(b) stats::median(lr[resampleWithin(strata)]), numeric(1))))

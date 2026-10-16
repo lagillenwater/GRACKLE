@@ -67,3 +67,17 @@ test_that("classifyPrograms maps the two calls to the four groups", {
                c("drops_out", "reduced_concordant", "persists", "present_not_patient_specific"))
   expect_equal(classifyPrograms(0.5, 0.01, -0.5), "present_not_patient_specific")
 })
+
+test_that("seeded nulls and bootstraps do not depend on the collation locale", {
+  skip_if_not(collationAvailable(), "en_US.UTF-8 collation not available")
+  strata <- rep(c("b", "a", "C"), each = 4)
+  for_both <- function(f) lapply(c("C", "en_US.UTF-8"), function(loc) withr::with_collate(loc, withr::with_seed(1, f())))
+  expect_identical(for_both(function() permuteWithin(strata))[[1]], for_both(function() permuteWithin(strata))[[2]])
+  expect_identical(for_both(function() resampleWithin(strata))[[1]], for_both(function() resampleWithin(strata))[[2]])
+  pairs <- withr::with_seed(2, data.frame(tumor_act = runif(24), organoid_act = runif(24),
+                                          cancer_type = rep(c("b", "a", "C"), each = 8), fold = rep(1:2, 12)))
+  conc <- for_both(function() persistenceConcordance(pairs, n_perm = 200, n_boot = 200, seed = 3))
+  ret <- for_both(function() persistenceRetention(pairs, n_perm = 200, n_boot = 200, seed = 3))
+  expect_identical(conc[[1]], conc[[2]])
+  expect_identical(ret[[1]], ret[[2]])
+})

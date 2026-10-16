@@ -66,3 +66,14 @@ test_that("a graph built from a training subset contains only those samples", {
   expect_equal(rownames(g), train$profile_id)
   expect_false(any(c("o2", "o6", "t2a") %in% rownames(g)))
 })
+
+test_that("knnSparsify breaks ties by the byte order of the ids, whatever the collation locale", {
+  ids <- c("b", "a", "C")
+  S <- matrix(1, 3, 3, dimnames = list(ids, ids))
+  K <- withr::with_collate("C", knnSparsify(S, 1))
+  ## byte order is "C" < "a" < "b": b and a keep C, C keeps a
+  expect_equal(unname(K[cbind(c("b", "a", "C"), c("C", "C", "a"))]), c(1, 1, 1))
+  expect_equal(K["a", "b"], 0)
+  skip_if_not(collationAvailable(), "en_US.UTF-8 collation not available")
+  expect_identical(withr::with_collate("en_US.UTF-8", knnSparsify(S, 1)), K)
+})

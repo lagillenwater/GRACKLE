@@ -15,7 +15,7 @@ knnSparsify <- function(S, k_nn, secondary = NULL) {
   n <- nrow(S)
   ids <- rownames(S)
   if (is.null(ids)) ids <- as.character(seq_len(n))
-  id_rank <- rank(ids, ties.method = "first")
+  id_rank <- order(order(ids, method = "radix"))   # byte order: ties never depend on the collation locale
   pick <- lapply(seq_len(n), function(i) {
     s <- S[i, ]
     s[i] <- -Inf
