@@ -103,8 +103,9 @@ saveRDS(split(h$gene_symbol, h$gs_name), file.path(ann_dir, "hallmark.rds"))
 note(file.path(ann_dir, "hallmark.rds"), paste("msigdbr", packageVersion("msigdbr"), "collection H"))
 
 ## 5. DepMap. The portal blocks scripted downloads, so the 2D screens and NextGen metadata come
-## from DepMap's figshare deposits (pinned file ids and md5s); only the genome-wide NextGen gene
-## effects (portal file set "NextGen Model Manuscript 2026") are a manual download.
+## from DepMap's figshare deposits (pinned file ids and md5s); the screen-level gene effects that
+## include the NextGen 3D screens, and the matching Model.csv, are a manual portal download (DepMap
+## Public 26Q3; files and md5s in depmap_nextgen_files.csv).
 figshare <- data.frame(
   file = c("CRISPRGeneEffect.csv", "Model.csv", "AchillesNonessentialControls.csv",
            "nextgen_model_metadata.csv", "nextgen_screen_metadata.csv"),

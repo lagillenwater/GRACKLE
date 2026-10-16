@@ -48,11 +48,11 @@ message("models in no model table, dropped: 2D ", length(id2$dropped), ", 3D ", 
         if (length(id3$dropped)) paste0(" (", paste(id3$dropped, collapse = ", "), ")"))
 if (ncol(E_ng2) >= 1000) {
   E2 <- E_ng2
-  source_2d <- sprintf("NextGen manuscript run, shared with 3D (%d traditional models)", ncol(E_ng2))
+  source_2d <- sprintf("%s screen-level file, shared with 3D (%d traditional models)", unique(ng$release), ncol(E_ng2))
 } else {
   E24 <- readDepmapEffect(file.path(dm_dir, "CRISPRGeneEffect.csv"), hgnc)
   E2 <- E24[, intersect(colnames(E24), models24$ModelID[models24$GrowthPattern %in% c("Adherent", "Suspension", "Mixed")]), drop = FALSE]
-  source_2d <- sprintf("DepMap 24Q4, a separate run (the NextGen file has %d traditional models)", ncol(E_ng2))
+  source_2d <- sprintf("DepMap 24Q4, a separate run (the %s file has %d traditional models)", unique(ng$release), ncol(E_ng2))
 }
 E2 <- E2[, is.na(hcmi_of(colnames(E2))), drop = FALSE]
 G2 <- coessGraph(E2, genes, nonessential, arm)
