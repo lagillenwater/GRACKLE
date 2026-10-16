@@ -17,43 +17,48 @@ GRACKLE(
   error_terms = FALSE,
   iterations = 100,
   svd_W,
-  svd_H
+  svd_H,
+  dtype = c("float32", "float16", "float64")
 )
 }
 \arguments{
-\item{Y}{Input gene expression data}
+\item{Y}{Numeric matrix, samples x genes, nonnegative.}
 
-\item{net_similarity}{Similarity matrix based on GRN}
+\item{net_similarity}{Gene similarity (genes x genes), symmetric and nonnegative.}
 
-\item{patient_similarity}{Similarity matrix based on patient metadata}
+\item{patient_similarity}{Sample similarity (samples x samples), symmetric and nonnegative.}
 
-\item{diff_threshold}{A numeric value representing the threshold for the difference in W and H matrices between iterations. Default is 1e-4}
+\item{diff_threshold}{Relative change in the objective that counts as converged. Default 1e-4.}
 
-\item{lambda_1}{A numeric value representing the first regularization parameter. Default is 0.5.}
+\item{lambda_1}{Sample-graph penalty weight. Default 0.5.}
 
-\item{lambda_2}{A numeric value representing the second regularization parameter. Default is 0.5.}
+\item{lambda_2}{Gene-graph penalty weight. Default 0.5.}
 
-\item{k}{An integer specifying the number of clusters or components. Default is 5.}
+\item{k}{Number of latent variables. Default 5.}
 
-\item{verbose}{A boolean value as to whether to print loss error or not. Default is FALSE.}
+\item{verbose}{Print the objective at each iteration. Default FALSE.}
 
-\item{beta}{A numeric value representing the degree of l2 regularization. Default is 0.}
+\item{beta}{Unused; kept for backward compatibility.}
 
-\item{error_terms}{A boolean to determine whether or not to calculate error terms. Default is False}
+\item{error_terms}{Unused; kept for backward compatibility.}
 
-\item{iterations}{Number of iterations}
+\item{iterations}{Maximum number of iterations. Default 100.}
+
+\item{svd_W}{Initial W (samples x k), for example from \code{\link[=svdInit]{svdInit()}}.}
+
+\item{svd_H}{Initial H (k x genes), for example from \code{\link[=svdInit]{svdInit()}}.}
+
+\item{dtype}{TensorFlow precision: "float32" (default), "float16" or "float64".}
 }
 \value{
-A list containing the following components:
-\item{residual}{A matrix representing the residuals, calculated as \code{Y - W \%*\% H}.}
-\item{H}{The matrix \code{H} obtained from the NMF calculation.}
-\item{W}{The matrix \code{W} obtained from the NMF calculation.}
-\item{error}{A vector containing the reconstruction error at each iteration.}
-\item{H_diff}{A vector containing the differences in \code{H} between iterations.}
-\item{W_diff}{A vector containing the differences in \code{W} between iterations.}
-\item{pat_sim_error_vec}{A vector containing the patient similarity error at each iteration.}
-\item{grn_error_vec}{A vector containing the gene regulatory network error at each iteration.}
+A list with \code{W}, \code{H}, \code{svd_W}, \code{svd_H}, \code{loss_trace} (a data frame with columns
+iteration, reconstruction, sample_graph, gene_graph, total), \code{n_iter} and \code{converged}.
 }
 \description{
-Function for running Graph Regularization Across Contextual KnowLedgE
+Graph Regularized non-negative matrix factorization Across Contextual KnowLedgE.
+Factorizes \code{Y} (samples x genes) as \code{W \%*\% H} with a sample-graph penalty on \code{W} and a
+gene-graph penalty on \code{H}, using multiplicative updates. The objective is
+\verb{||Y - WH||_F^2 + lambda_1 tr(W' L_p W) + lambda_2 tr(H L_g H')} with \code{L = D - S} for each
+similarity matrix \code{S}. Fitting stops when the relative change in that objective falls
+below \code{diff_threshold}, or after \code{iterations} iterations.
 }
