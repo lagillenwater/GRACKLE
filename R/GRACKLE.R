@@ -5,7 +5,6 @@
 #'  Function for running Graph Regularization Across Contextual KnowLedgE
 #'
 #' @importFrom Matrix Matrix
-#' @import dynutils
 #' @import tensorflow
 #' @param Y Input gene expression data
 #' @param net_similarity Similarity matrix based on GRN

@@ -4,3 +4,12 @@
 .httr-oauth
 .DS_Store
 .quarto
+GRACKLE_data/
+logs/*
+!logs/.gitkeep
+analysis/hcmi_persistence/results/
+analysis/hcmi_persistence/fixture/out/
+_moved_aside/
+*.R~
+.#*
+\#*#

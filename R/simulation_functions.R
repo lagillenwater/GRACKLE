@@ -182,7 +182,6 @@ networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
 #' simualateExpression
 #' 
 #' @description simulateExpression is a function for simulating gene expression data from a GRN. It applies the functions outlined in the sgresR package vignette.
-#' @import sgnesR 
 #' @importFrom igraph V degree
 #' @param g igraph graph object
 #' @param max_expression Numeric value for the maximum_gene expression. (Default is 2000)
@@ -193,11 +192,12 @@ networkNoise<- function(graph, goal_modularity, membership, large_clusters) {
 #' @param noise_constant  Numeric value representing how much of the rest of the matrix to add noise to. 
 #' @export
 simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NULL, select_nodes = NULL, perturbation_constant = 1.5, noise_constant = .3) {
+  if (!requireNamespace("sgnesR", quietly = TRUE)) stop("simulateExpression needs the sgnesR package")
   
   res <- lapply(1:iterations, function(x) {
     # Specifying global reaction parameters.
     time <- sample(400:600,1)
-    rp<-new("rsgns.param",time=0,stop_time=time,readout_interval= time)
+    rp <- methods::new(methods::getClass("rsgns.param", where = asNamespace("sgnesR")), time = 0, stop_time = time, readout_interval = time)
     
     # Specifying the reaction rate constant vector for following reactions: (1) Translation rate, (2) RNA degradation rate, (3) Protein degradation rate, (4) Protein binding rate, (5) unbinding rate, (6) transcription rate.
   
@@ -233,10 +233,10 @@ simulateExpression <- function(g, max_expression = 2000, iterations = 3, rc = NU
     }
   
     #Declaring input data object
-    rsg <- new("rsgns.data",network=g, rconst=rc)
+    rsg <- methods::new(methods::getClass("rsgns.data", where = asNamespace("sgnesR")), network = g, rconst = rc)
   
     #Call the R function for SGN simulator
-    xx <- rsgns.rn(rsg, rp, timeseries=FALSE, sample=1)
+    xx <- sgnesR::rsgns.rn(rsg, rp, timeseries = FALSE, sample = 1)
   
     return(xx$expression)
   })

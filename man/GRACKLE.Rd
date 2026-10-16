@@ -13,7 +13,11 @@ GRACKLE(
   lambda_2 = 0.5,
   k = 5,
   verbose = FALSE,
-  beta = 0
+  beta = 0,
+  error_terms = FALSE,
+  iterations = 100,
+  svd_W,
+  svd_H
 )
 }
 \arguments{
@@ -34,6 +38,10 @@ GRACKLE(
 \item{verbose}{A boolean value as to whether to print loss error or not. Default is FALSE.}
 
 \item{beta}{A numeric value representing the degree of l2 regularization. Default is 0.}
+
+\item{error_terms}{A boolean to determine whether or not to calculate error terms. Default is False}
+
+\item{iterations}{Number of iterations}
 }
 \value{
 A list containing the following components:

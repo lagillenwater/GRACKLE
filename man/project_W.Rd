@@ -4,12 +4,10 @@
 \alias{project_W}
 \title{project_W}
 \usage{
-project_W(test_data, H_train, k)
+project_W(test_data, H_train)
 }
 \arguments{
 \item{H_train}{Matrix of trained H matrix}
-
-\item{k}{Numeric value representing the number of groups}
 
 \item{test_expression}{Data.frame of test expression data}
 }

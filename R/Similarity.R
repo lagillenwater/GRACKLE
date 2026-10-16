@@ -3,7 +3,6 @@
 #' 
 #' @description   This function calculates the similarity matrix from an input matrix
 #'
-#' @useDynLib GRACKLE
 #' @param input_matrix Input matrix of adjacency matrix or 
 #' @export
 similarityCalc <- function(input_matrix) {

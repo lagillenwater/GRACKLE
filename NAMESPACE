@@ -33,38 +33,39 @@ export(similarityCalc)
 export(simulateExpression)
 export(simulateMetadata)
 export(split_data)
-import(NMF)
-import(PLIER)
 import(dplyr)
-import(dynutils)
 import(glmnet)
 import(matrixStats)
 import(nnls)
-import(sgnesR)
 import(tensorflow)
 import(tibble)
 import(tidyr)
 importFrom(FNN,get.knn)
 importFrom(Matrix,Matrix)
 importFrom(RColorBrewer,brewer.pal)
-importFrom(dplyr,"%>%")
-importFrom(dplyr,arrange)
-importFrom(dplyr,bind_rows)
-importFrom(dplyr,filter)
-importFrom(dplyr,mutate)
-importFrom(dplyr,select)
-importFrom(igraph,V)
-importFrom(igraph,add_edges)
-importFrom(igraph,as_adjacency_matrix)
-importFrom(igraph,cluster_louvain)
-importFrom(igraph,degree)
-importFrom(igraph,degree.sequence.game)
-importFrom(igraph,graph_from_data_frame)
-importFrom(igraph,modularity)
-importFrom(igraph,neighbors)
-importFrom(igraph,rewire)
-importFrom(parallel,detectCores)
-importFrom(parallel,mclapply)
+importFrom(dplyr,
+  "%>%",
+  arrange,
+  bind_rows,
+  filter,
+  mutate,
+  select
+)
+importFrom(igraph,
+  V,
+  add_edges,
+  as_adjacency_matrix,
+  cluster_louvain,
+  degree,
+  degree.sequence.game,
+  graph_from_data_frame,
+  modularity,
+  neighbors,
+  rewire
+)
+importFrom(parallel,
+  detectCores,
+  mclapply
+)
 importFrom(ppcor,pcor)
 importFrom(utils,download.file)
-useDynLib(GRACKLE)

@@ -1,0 +1,38 @@
+name: grackle
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.12
+  - r-base=4.5
+  - tensorflow=2.21
+  - r-tensorflow=2.20
+  - r-reticulate
+  - r-nnls
+  - r-igraph
+  - r-cluster
+  - r-clue
+  - r-irlba
+  - r-data.table
+  - r-r.utils
+  - r-matrixstats
+  - r-matrix
+  - r-glmnet
+  - r-fnn
+  - r-ppcor
+  - r-rcolorbrewer
+  - r-dplyr
+  - r-tidyr
+  - r-tibble
+  - r-ggplot2
+  - r-ggrepel
+  - r-patchwork
+  - r-jsonlite
+  - r-httr2
+  - r-msigdbr
+  - r-readxl
+  - r-withr
+  - r-devtools
+  - r-roxygen2
+  - r-testthat
+  - r-remotes

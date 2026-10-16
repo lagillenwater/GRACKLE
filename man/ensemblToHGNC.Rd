@@ -2,7 +2,7 @@
 % Please edit documentation in R/utility_functions.R
 \name{ensemblToHGNC}
 \alias{ensemblToHGNC}
-\title{entrezToHGNC}
+\title{ensemblToHGNC}
 \usage{
 ensemblToHGNC(ensembl_ids)
 }
@@ -13,5 +13,5 @@ ensemblToHGNC(ensembl_ids)
 hgnc_ids   Character vector of HGNC ID's
 }
 \description{
-entrezToHGNC is a function for converting entrez ID's to HGNC ID's
+ensemblToHGNC is a function for converting entrez ID's to HGNC ID's
 }

@@ -5,7 +5,6 @@
 #' 
 #' runNMF runs the version of NMF from the NMF package. 
 #'
-#' @import NMF
 #' @param expression_matrix Matrix of gene expression data (samples as rows, genes as columns)
 #' @param k A numeric variable representing the number of latent variables (aka, rank). Default is 5.
 #' @param method A string representing the nmf algorithm to run. See nmf for options. Default is 'lee'.
@@ -14,18 +13,14 @@
 #'
 #' \item{W}{The matrix \code{W} obtained from the NMF calculation.}
 #' @export
-runNMF <- function(expression_matrix,k = 5, method = 'lee', seed = 42) {
- 
-  
-  # Run NMF with parallel computing
+runNMF <- function(expression_matrix, k = 5, method = 'lee', seed = 42) {
+  if (!requireNamespace("NMF", quietly = TRUE)) stop("runNMF needs the NMF package (install it separately)")
   res <- NMF::nmf(expression_matrix, rank = k, seed = seed)
-  
-    
-    W <- basis(res)
-    H <- coef(res)
-    
-  return(list(W = W,H = H))
-} 
+  W <- NMF::basis(res)
+  H <- NMF::coef(res)
+  return(list(W = W, H = H))
+}
+
 
 #' runGRNMF
 #' 
@@ -75,15 +70,14 @@ runGRNMF <- function(expression_matrix, k = 5,  seed = 42, max_iter = 200, alpha
 #' 
 #' runPLIER implements a version of PLIER for comparison. 
 #'
-#' @import PLIER
 #' @param expression_matrix Matrix of gene expression data (samples as rows, genes as columns)
 #' @param k A numeric variable representing the number of latent variables (aka, rank). Default is 5.
 #' @return
 #' @export
 runPLIER <- function(expression_matrix, k) {
-  data(canonicalPathways)
-  res <- PLIER(data = expression_matrix,priorMat = canonicalPathways,k,rseed = 42)
-  W= res$B
-  H = res$Z
-  return(list(W =  W, H = H))
+  if (!requireNamespace("PLIER", quietly = TRUE)) stop("runPLIER needs the PLIER package (GitHub: wgmao/PLIER)")
+  env <- new.env()
+  utils::data("canonicalPathways", package = "PLIER", envir = env)
+  res <- PLIER::PLIER(data = expression_matrix, priorMat = env$canonicalPathways, k, rseed = 42)
+  return(list(W = res$B, H = res$Z))
 }

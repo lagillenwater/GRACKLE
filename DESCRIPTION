@@ -9,19 +9,34 @@ License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
     license
 Encoding: UTF-8
 Imports:
-	dplyr,
-	igraph,
-	Rcpp,
-	nnls,
-	glmnet,
-	parallel,
-	sgnesR,
-	ppcor,
-	FNN,
-	NMF,
-	RColorBrewer,
-	tidyr
-LinkingTo:
-	Rcpp
+    clue,
+    cluster,
+    data.table,
+    dplyr,
+    FNN,
+    glmnet,
+    igraph,
+    irlba,
+    jsonlite,
+    Matrix,
+    matrixStats,
+    methods,
+    nnls,
+    parallel,
+    ppcor,
+    RColorBrewer,
+    stats,
+    tensorflow,
+    tibble,
+    tidyr,
+    utils,
+    withr
+Suggests:
+    NMF,
+    PLIER,
+    sgnesR,
+    testthat (>= 3.0.0),
+    tidyestimate
+Config/testthat/edition: 3
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+Config/roxygen2/version: 8.1.0
