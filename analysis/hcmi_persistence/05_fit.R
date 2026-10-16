@@ -10,7 +10,7 @@ tasks <- as.data.frame(fread(args$tasks))
 t <- tasks[as.integer(args$index), , drop = FALSE]
 if (!nrow(t) || is.na(t$task_id)) stop("no task at index ", args$index, " of ", args$tasks)
 out <- file.path(cfg$run, "fits", t$arm, t$mode, paste0(t$task_id, ".rds"))
-if (!needsFit(if (file.exists(out)) readRDS(out) else NULL, if (length(cap)) cap$iterations else NA)) {
+if (!needsFit(readResult(out), if (length(cap)) cap$iterations else NA)) {
   message("already done: ", out)
   quit(save = "no", status = 0)
 }
@@ -30,7 +30,7 @@ res <- tryCatch(
                                      test_role = if (transfer) "organoid" else "all"), cap)),
        error = NULL),
   error = function(e) list(fit = NULL, error = conditionMessage(e)))
-saveRDS(c(list(meta = meta), res), out)
+saveResult(c(list(meta = meta), res), out)
 writeProvenance(out, inputs = c(file.path(cfg$processed, c("Y.rds", "samples_included.rds", "k.rds")), graph_file),
                 extra = list(task = meta))
 if (!is.null(res$error)) {

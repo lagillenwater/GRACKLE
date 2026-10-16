@@ -67,3 +67,17 @@ test_that("needsFit refits only missing, failed, or cap-limited unconverged resu
   expect_false(needsFit(capped, iterations = 20000L))
   expect_false(needsFit(done, iterations = 40000L))
 })
+
+test_that("a task result is written whole, and a truncated one reads as missing", {
+  d <- withr::local_tempdir()
+  out <- file.path(d, "t.rds")
+  saveResult(list(meta = list(task_id = "t"), fit = list(n_iter = 5L, converged = TRUE)), out)
+  expect_identical(list.files(d), "t.rds")
+  expect_identical(readResult(out)$fit$n_iter, 5L)
+  expect_null(readResult(file.path(d, "absent.rds")))
+  bytes <- readBin(out, "raw", file.size(out))
+  writeBin(bytes[seq_len(length(bytes) %/% 2)], out)   # a task killed while writing
+  expect_warning(r <- readResult(out), "unreadable")
+  expect_null(r)
+  expect_true(needsFit(r))
+})

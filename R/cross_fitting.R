@@ -70,3 +70,33 @@ needsFit <- function(result, iterations = NA) {
   if (is.null(result) || !is.null(result$error) || is.null(result$fit)) return(TRUE)
   !is.na(iterations) && !isTRUE(result$fit$converged) && result$fit$n_iter < iterations
 }
+
+#' saveResult
+#'
+#' Writes a task result under a temporary name and renames it into place, so a task killed while
+#' writing never leaves a partial file under the final name.
+#' @param x Result list.
+#' @param path Final path.
+#' @return `path`, invisibly.
+#' @export
+saveResult <- function(x, path) {
+  tmp <- paste0(path, ".tmp")
+  saveRDS(x, tmp)
+  if (!file.rename(tmp, path)) stop("saveResult: could not move ", tmp, " to ", path)
+  invisible(path)
+}
+
+#' readResult
+#'
+#' Reads a task result. A missing file, or one that cannot be read (a task killed while writing it),
+#' gives NULL, so combine lists the setting as missing and a resubmitted task fits it again.
+#' @param path Result path.
+#' @return The result list, or NULL.
+#' @export
+readResult <- function(path) {
+  if (!file.exists(path)) return(NULL)
+  tryCatch(readRDS(path), error = function(e) {
+    warning("unreadable task result ", path, ": ", conditionMessage(e), call. = FALSE)
+    NULL
+  })
+}

@@ -7,9 +7,10 @@ np <- as.integer(args$n_perm); nb <- as.integer(args$n_boot); nm <- as.integer(a
 cores <- as.integer(args$cores)
 res_dir <- file.path(cfg$run, "results")
 ## Results for the task ids in `ids` only, so files left over from an earlier selection are never mixed in.
+## An unreadable file counts as missing.
 readFits <- function(arm, mode, ids) {
   fs <- file.path(cfg$run, "fits", arm, mode, paste0(ids, ".rds"))
-  lapply(fs[file.exists(fs)], readRDS)
+  Filter(Negate(is.null), lapply(fs, readResult))
 }
 optional <- function(path, reader) if (file.exists(path)) reader(path) else NULL
 samples <- readRDS(file.path(cfg$processed, "samples_included.rds"))
