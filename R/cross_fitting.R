@@ -56,3 +56,17 @@ fitTask <- function(Y, samples, gene_graph, k, alpha_1, alpha_2, fold,
        final_loss = utils::tail(fit$loss_trace, 1), recon_test = recon_test,
        train_ids = samples$profile_id[train], test_ids = samples$profile_id[test])
 }
+
+#' needsFit
+#'
+#' Whether a cross-fitting task must be (re)fit. A missing or failed result is refit. A result that
+#' stopped unconverged is refit only when a higher iteration cap is given, so a resubmission with a
+#' raised cap touches nothing that already converged.
+#' @param result A task result as written by `05_fit.R` (meta, fit, error), or NULL if none exists.
+#' @param iterations The iteration cap of the new attempt, or NA for the default.
+#' @return TRUE or FALSE.
+#' @export
+needsFit <- function(result, iterations = NA) {
+  if (is.null(result) || !is.null(result$error) || is.null(result$fit)) return(TRUE)
+  !is.na(iterations) && !isTRUE(result$fit$converged) && result$fit$n_iter < iterations
+}

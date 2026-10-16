@@ -23,4 +23,4 @@ if [[ "$KIND" == "main" ]]; then
 else
   TASKS="$GRACKLE_SCRATCH/$GRACKLE_RUN_ID/tasks/${KIND}_${ARM}.csv"
 fi
-Rscript analysis/hcmi_persistence/05_fit.R --tasks "$TASKS" --index "$((SLURM_ARRAY_TASK_ID + 1))"
+Rscript analysis/hcmi_persistence/05_fit.R --tasks "$TASKS" --index "$((SLURM_ARRAY_TASK_ID + 1))" ${ITERATIONS:+--iterations "$ITERATIONS"}

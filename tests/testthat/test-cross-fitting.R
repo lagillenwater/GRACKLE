@@ -52,3 +52,18 @@ test_that("fitTask's iteration cap leaves room for the slowest settings to conve
   expect_equal(formals(fitTask)$iterations, 20000)
   expect_equal(formals(fitTask)$diff_threshold, 1e-6)
 })
+
+## coess_3d_a04_k2_f4 stopped at the 20,000 cap; rerunning it with a higher cap must refit that
+## result and leave every finished or converged one alone.
+test_that("needsFit refits only missing, failed, or cap-limited unconverged results", {
+  done <- list(fit = list(converged = TRUE, n_iter = 500L), error = NULL)
+  capped <- list(fit = list(converged = FALSE, n_iter = 20000L), error = NULL)
+  failed <- list(fit = NULL, error = "boom")
+  expect_true(needsFit(NULL))
+  expect_true(needsFit(failed))
+  expect_false(needsFit(done))
+  expect_false(needsFit(capped))
+  expect_true(needsFit(capped, iterations = 40000L))
+  expect_false(needsFit(capped, iterations = 20000L))
+  expect_false(needsFit(done, iterations = 40000L))
+})
