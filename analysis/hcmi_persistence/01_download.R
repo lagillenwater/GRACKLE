@@ -12,7 +12,7 @@ note <- function(path, source) {
 fetch <- function(url, dest) {
   if (!file.exists(dest)) {
     dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
-    request(url) |> req_retry(max_tries = 5) |> req_perform(path = dest)
+    request(url) |> req_retry(max_tries = 5, retry_on_failure = TRUE) |> req_perform(path = dest)
   }
   note(dest, url)
 }
@@ -49,11 +49,11 @@ for (b in batches) {   # download batches (I/O), not a loop over data
   if (length(b) == 1) {
     dest <- file.path(star_dir, b, todo$file_name[todo$profile_id == b])
     dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
-    request(paste0("https://api.gdc.cancer.gov/data/", b)) |> req_retry(max_tries = 5) |> req_perform(path = dest)
+    request(paste0("https://api.gdc.cancer.gov/data/", b)) |> req_retry(max_tries = 5, retry_on_failure = TRUE) |> req_perform(path = dest)
   } else {
     tgz <- tempfile(fileext = ".tar.gz")
     request("https://api.gdc.cancer.gov/data") |> req_body_json(list(ids = as.list(b))) |>
-      req_retry(max_tries = 5) |> req_perform(path = tgz)
+      req_retry(max_tries = 5, retry_on_failure = TRUE) |> req_perform(path = tgz)
     utils::untar(tgz, exdir = star_dir)
     unlink(tgz)
   }
@@ -120,7 +120,7 @@ invisible(lapply(seq_len(nrow(figshare)), function(i) {
   dest <- file.path(dm_dir, figshare$file[i])
   if (!file.exists(dest) || unname(tools::md5sum(dest)) != figshare$md5[i]) {
     request(sprintf("https://ndownloader.figshare.com/files/%d", figshare$id[i])) |>
-      req_retry(max_tries = 5) |> req_perform(path = dest)
+      req_retry(max_tries = 5, retry_on_failure = TRUE) |> req_perform(path = dest)
   }
   if (unname(tools::md5sum(dest)) != figshare$md5[i]) stop("md5 mismatch for ", figshare$file[i])
   note(dest, figshare$source[i])
