@@ -50,7 +50,7 @@ From ElHarouni et al. 2026, *Nature* (doi:10.1038/s41586-026-10806-y):
 - **Transcriptional concordance:** assessed on 297 tumor-model pairs (Celligner). The "92%" is 263 of the 286 models assessed by at least 4 of 6 methods.
 - **Failed derivations:** tumors from 168 failed derivation attempts were profiled. In COAD, ESCA and PAAD, failed tumors showed more DNA-repair and cell-cycle states, and successful ones more differentiation.
 - **Culture medium:** affects transcriptional fidelity. For example, in GBM, NS-A medium beats conditioned medium.
-- **Data locations:** the GDC project `HCMI-CMDC` (open STAR counts) and the GDC publication page `HCMI-CMDC-2026` (Supplementary Table 1: model type, medium, derivation center, treatment, clinical). Mutations and clinical data are also in cBioPortal `pancan_hcmi_2025`.
+- **Data locations:** the GDC project `HCMI-CMDC` (open STAR counts) and the GDC publication page `HCMI-CMDC-2026` (which hosts only file manifests). Mutations and clinical data are also in cBioPortal `pancan_hcmi_2025`.
 
 From the GDC API (2026-10-15):
 - 1,153 open-access STAR-count RNA-seq files.
@@ -101,8 +101,10 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
 
 ### 4.1 Download (`01_download.R`)
 - **GDC API:** every `HCMI-CMDC` file with `data_type = "Gene Expression Quantification"` and workflow `STAR - Counts`, plus case, sample and aliquot metadata. Record the GDC data release, the download date and each file's md5.
-- **Supplementary Table 1** from the GDC publication page `HCMI-CMDC-2026`. If it is not hosted there, the user places the Nature supplementary file in `raw/manual/`; the script verifies it is present and records its sha256.
-- **cBioPortal `pancan_hcmi_2025`:** mutation calls and sample clinical data, used for genotype annotation only.
+- **cBioPortal `pancan_hcmi_2025`, via its REST API**: all patient and sample clinical attributes, plus mutations from profile `pancan_hcmi_2025_mutations` over sample list `pancan_hcmi_2025_sequenced`. Its sample IDs equal GDC sample submitter IDs (e.g., `HCM-CSHL-0085-C24-01A`). Checked 2026-10-15:
+  - it carries `GROWTH_PATTERN` ("3D Organoid", "2D Cell Line", "3D Spheroid"), `CULTURE_MEDIA`, `TREATMENT_STATUS`, `DIAGNOSIS_TCGA_HCMI_CODE`, `AGE`, `SEX`, `RACE_CATEGORY`, and four DNA-based purity callers (`PURITY_ABSOULTE` [sic], `PURITY_ASCAT`, `PURITY_HACHET` [sic], `PURITY_PURPLE`) plus RNA-based `PURITY_ESTIMATE`;
+  - the GDC publication page `HCMI-CMDC-2026` hosts only file manifests, so the paper's Supplementary Table 1 is not needed;
+  - the cBioPortal datahub S3 archive returns 403, so the API is used.
 - **STRING v12** (`9606.protein.links.full.v12.0.txt`, `9606.protein.links.v12.0.txt`, `9606.protein.aliases.v12.0.txt`). The full-links file carries the per-channel scores.
 - **DepMap** (one pinned public release): `CRISPRGeneEffect` (Chronos), model metadata (growth pattern, HCMI identifiers), the non-essential control gene list, and the NextGen 3D screens. **The DepMap portal blocks scripted downloads** (a bot-verification page, checked 2026-10-15). The user downloads these files in a browser and syncs them to `raw/manual/depmap/`. `01_download.R` verifies they are present and records sha256 and the release name.
 - **Sanger HCMI organoid CRISPR screens** (Herranz-Ors et al. 2026), from their deposited gene-level scores. Downloaded by script if a direct URL exists; otherwise by the user into `raw/manual/sanger/`, the same way as DepMap.
@@ -118,14 +120,23 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
   - pairing: `parent_sample_id`, `pair_id`
   - covariates: `purity_dna`, `prior_treatment`, `age`, `sex`, `ancestry`
   - bookkeeping: `fold`, `included`, `exclusion_reason`
-- **Included organoids:** profiles whose model type is "3D organoid" in Supplementary Table 1.
+- **Field sources:**
+  - **Model type:** cBioPortal `GROWTH_PATTERN` of the model sample.
+  - **Medium:** `CULTURE_MEDIA`.
+  - **Passage:** GDC `passage_count`.
+  - **Derivation center:** the center code in the HCMI ID (`HCM-BROD-...` gives `BROD`).
+  - **Cancer type:** `DIAGNOSIS_TCGA_HCMI_CODE`.
+  - **Prior treatment:** `TREATMENT_STATUS == "Treated"`.
+  - **Age and sex:** `AGE`, `SEX`.
+  - **Ancestry annotation:** `RACE_CATEGORY` (reported race category, not the paper's genetic ancestry estimate).
+- **Included organoids:** model profiles whose `GROWTH_PATTERN` is "3D Organoid".
 - **Included tumors:** all tumor profiles with RNA. That covers primary, metastatic and recurrent tumors, human tumor original cells, and failed-derivation tumors.
 - **FFPE:** a profile from an FFPE-preserved sample (`preservation_method == "FFPE"`, including slides and FFPE scrolls) is included only when no frozen profile exists for the same tumor sample. "Same tumor sample" means the same case and the same `tumor_descriptor`, because slides and scrolls get their own sample IDs. The paper attributes some low concordance to FFPE artifacts. The preservation method is kept as a column.
 - **Duplicate profiles:** when one sample has more than one RNA profile, the profile with the lexicographically first `profile_id` is kept and the rest are excluded ("duplicate profile of the same sample"). This keeps a patient from entering the pairs twice through re-sequencing.
 - **Unpaired organoids:** 3D organoids with no included tumor partner are excluded, following the training-set decision in Section 3.
 - **Pairing:**
-  - An organoid pairs with the tumor sample it was derived from (`parent_sample_id` from Supplementary Table 1).
-  - If the parent sample is not recorded, it pairs with every tumor sample of the case, and the case is flagged.
+  - An organoid pairs with the tumor sample it was derived from. That is the case's one included tumor profile whose GDC `tumor_descriptor` matches the model sample's `tumor_descriptor` (the origin of the model).
+  - If no single tumor sample matches, it pairs with every tumor sample of the case, and the case is flagged.
   - ATCC re-expanded models ("Expanded Next Generation Cancer Model") are excluded as duplicates.
 - **Filter-count table:** the script writes one row per filter step with profiles, cases and pairs remaining (`filter_counts.csv`).
 - **Committed:** `sample_table.csv` and `filter_counts.csv`, which are small and open-access.
@@ -163,7 +174,7 @@ Four arms, each a single source, all over the final gene set:
    - 3D: organoid and spheroid screens. If DepMap NextGen and Sanger scores cannot be put on one scale (checked at implementation), use the larger source alone. For each fold, the screens of models from that fold's held-out cases are removed before the graph is built. The reference fit uses all 3D screens.
 2. **Informative genes.** A gene gets edges only if the SD of its Chronos scores across the arm's models exceeds the 95th percentile of SDs among DepMap's non-essential control genes. Without this filter, the nearest-neighbor step would give noise-only genes random edges.
 3. **Nuisance correction.** GLS whitening across models (Wainberg et al. 2021, *Nat Genet*): estimate the model-by-model covariance from all genes and whiten the model dimension by its inverse square root. This removes shared line-level structure such as screen quality and proliferation.
-4. **Similarity.** Pearson correlation between informative genes' whitened profiles. Pairs on the same chromosome arm are set to 0 to remove CRISPR proximity artifacts; the arm comes from the cytogenetic `location` field of the pinned HGNC file (e.g., `17q21.31` gives `17q`). Negative values are set to 0.
+4. **Similarity.** GLS correlation between informative genes: the cosine of their whitened profiles after projecting out the whitened intercept (`1' * Sigma^(-1/2)`). This is the GLS analogue of a Pearson correlation; plain centering after whitening would leave each gene's mean effect as a shared pattern and correlate strongly essential genes with each other. Pairs on the same chromosome arm are set to 0 to remove CRISPR proximity artifacts; the arm comes from the cytogenetic `location` field of the pinned HGNC file (e.g., `17q21.31` gives `17q`). Negative values are set to 0.
 5. **Sparsify.** Keep each gene's 10 nearest neighbors among the final genes, with weight equal to the correlation, symmetrized with `pmax(S, t(S))`.
 
 **`string_mech`.**
@@ -178,7 +189,7 @@ Four arms, each a single source, all over the final gene set:
 - `combined_score / 1000` with no threshold, as in `tests/HTP_v2.R`. The diagonal is 0 rather than 1, which leaves the objective unchanged.
 
 ### 4.6 Purity requirement
-- Graph purity must be **DNA-based**, taken from Supplementary Table 1 or the cBioPortal clinical data.
+- Graph purity must be **DNA-based**: `purity_dna` is the median of the available DNA callers (`PURITY_ABSOULTE`, `PURITY_ASCAT`, `PURITY_HACHET`, `PURITY_PURPLE`) for each tumor sample. Agreement with cBioPortal's `CONSENSUS_PURITY` is reported.
 - **If no DNA-based tumor purity is available, the pipeline stops after step 02 and the user decides.** RNA-derived purity in the graph would be circular.
 
 ---
@@ -496,7 +507,7 @@ New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `
 | Risk | Response |
 |---|---|
 | No DNA-based tumor purity | Stop after step 02; the user decides (Section 4.6) |
-| Supplementary Table 1 not on the GDC publication page | The user places the Nature supplementary file in `raw/manual/`; its checksum is recorded |
+| cBioPortal lacks growth pattern or purity for many included samples | Report the coverage after step 02. Missing growth pattern excludes the model ("model type unknown"); missing purity gives that tumor no purity edges |
 | Model type or parent sample missing for some organoids | Unknown model type: excluded, with the reason recorded. Unknown parent: pair with all of the case's tumor samples and flag the case |
 | micromamba blocked on Alpine | Use a pinned Apptainer image (`rocker/r-ver` at a fixed version plus the same packages), run with `apptainer exec` |
 | Large k (> 100) | Raise `irlba` `nv`; fit cost grows roughly linearly in k and stays within the 4-core, 1-hour task budget at this size |
@@ -515,7 +526,7 @@ New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `
 
 These are checks of facts, not open design choices. The response to each outcome is fixed above.
 
-1. Whether Supplementary Table 1 is on the GDC publication page, and whether it has model type, parent sample and DNA purity (Sections 4.1, 4.6, 14).
+1. Coverage of cBioPortal's growth pattern and DNA purity fields for the included samples (Sections 4.1, 4.6, 14). Whether Supplementary Table 1 is available was checked on 2026-10-15; it is not needed.
 2. The included organoid pair count after filtering, which goes into `filter_counts.csv` and corrects the grant text.
 3. Whether R plus TensorFlow runs locally for the fixture (Section 13).
 4. Whether micromamba runs on Alpine (Section 14).
