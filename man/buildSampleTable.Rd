@@ -18,6 +18,7 @@ A list with samples (every profile, with included and exclusion_reason) and filt
 Applies the inclusion rules of spec Section 4.2 in order, recording the counts after each
 step: expanded models and non-tumor samples out; 3D organoids only; the FFPE rule; one
 profile per sample; parent-tumor pairing by tumor descriptor; organoids without a tumor
-partner out. Organoids inherit their parent tumor's annotations; tumors get DNA purity as
-the median of the four DNA callers.
+partner out. Cancer type is set per case (most frequent code, else the ICD-O site in the HCMI id).
+Organoids inherit their parent tumor's annotations; tumors get DNA purity as the median of the
+four DNA callers.
 }

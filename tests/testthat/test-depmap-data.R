@@ -47,3 +47,25 @@ test_that("combine3dSources combines agreeing sources and otherwise keeps the la
   expect_equal(colnames(b$effect), colnames(E3)); expect_match(b$decision, "Sanger alone")
   expect_equal(combine3dSources(E1)$decision, "DepMap 3D only")
 })
+
+test_that("screenClass reads the screen culture format at screen or model level", {
+  screens <- data.frame(ScreenID = c("SC-1", "SC-2", "SC-3", "SC-4", "SC-5"),
+                        ModelID = c("ACH-1", "ACH-2", "ACH-2", "ACH-3", "ACH-4"),
+                        ScreenType = c("2DS", "3DO", "2DO", "3DN", "3DO"),
+                        PassesQC = c("TRUE", "TRUE", "TRUE", "TRUE", "FALSE"), stringsAsFactors = FALSE)
+  models <- data.frame(ModelID = c("ACH-1", "ACH-2", "ACH-3"), CRISPRScreenType = c("2DS", "3DO", "3DN"))
+  s <- screenClass(c("SC-1", "SC-2", "SC-3", "SC-4", "SC-5"), screens, models)
+  expect_equal(s$class, c("2D", "3D", "exclude", "3D", "exclude"))     # 2DO is neither; failed QC is out
+  expect_equal(s$model_id, c("ACH-1", "ACH-2", "ACH-2", "ACH-3", "ACH-4"))
+  m <- screenClass(c("ACH-1", "ACH-2", "ACH-3", "ACH-9"), screens, models)
+  expect_equal(m$class, c("2D", "3D", "3D", "exclude"))
+  expect_equal(m$model_id, c("ACH-1", "ACH-2", "ACH-3", "ACH-9"))
+})
+
+test_that("collapseScreens averages repeat screens of a model", {
+  E <- matrix(c(1, 2, 3, 5, 7, 9), 2, dimnames = list(c("g1", "g2"), c("SC-1", "SC-2", "SC-3")))
+  out <- collapseScreens(E, c("ACH-1", "ACH-1", "ACH-2"))
+  expect_equal(colnames(out), c("ACH-1", "ACH-2"))
+  expect_equal(unname(out[, "ACH-1"]), c(2, 3.5))   # SC-1 = (1, 2), SC-2 = (3, 5)
+  expect_equal(unname(out[, "ACH-2"]), c(7, 9))
+})

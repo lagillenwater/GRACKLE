@@ -83,3 +83,39 @@ combine3dSources <- function(E_dm, E_sg = NULL, min_cor = 0.8) {
     list(effect = E_dm, decision = sprintf("DepMap alone (gene-mean r = %.2f < %.2f)", r, min_cor))
   }
 }
+
+#' screenClass
+#'
+#' Arm membership of each gene-effect column (spec Section 4.5): "2D" for traditional screens
+#' (ScreenType 2DS), "3D" for NextGen screens run in 3D culture (3DO dome organoids, 3DN CNS
+#' spheroids), "exclude" otherwise (including 2D coat screens of NextGen models and screens
+#' failing QC). Columns can be screen ids (matched to `screens$ScreenID`) or model ids (typed by
+#' `models$CRISPRScreenType`).
+#' @param ids Column ids of a gene-effect matrix.
+#' @param screens NextGen screen metadata (ScreenID, ModelID, ScreenType, PassesQC).
+#' @param models NextGen model metadata (ModelID, CRISPRScreenType).
+#' @return Data frame with id, model_id, screen_type, class.
+#' @export
+screenClass <- function(ids, screens, models) {
+  if (mean(ids %in% screens$ScreenID) > 0.5) {
+    s <- screens[match(ids, screens$ScreenID, incomparables = NA), , drop = FALSE]
+    type <- ifelse(toupper(as.character(s$PassesQC)) %in% "TRUE", s$ScreenType, NA_character_)
+    model <- s$ModelID
+  } else {
+    type <- models$CRISPRScreenType[match(ids, models$ModelID, incomparables = NA)]
+    model <- ids
+  }
+  cls <- ifelse(type %in% "2DS", "2D", ifelse(type %in% c("3DO", "3DN"), "3D", "exclude"))
+  data.frame(id = ids, model_id = model, screen_type = type, class = cls, stringsAsFactors = FALSE)
+}
+
+#' collapseScreens
+#' @param effect Genes x screens matrix.
+#' @param model_id Model of each column.
+#' @return Genes x models matrix, averaging the screens of each model.
+#' @export
+collapseScreens <- function(effect, model_id) {
+  groups <- split(seq_len(ncol(effect)), model_id)
+  out <- vapply(groups, function(i) rowMeans(effect[, i, drop = FALSE], na.rm = TRUE), numeric(nrow(effect)))
+  matrix(out, nrow = nrow(effect), dimnames = list(rownames(effect), names(groups)))
+}

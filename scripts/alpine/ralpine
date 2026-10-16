@@ -1,0 +1,299 @@
+#!/usr/bin/env bash
+#
+# Alpine access for the harness workflow: read-only, plus job submission.
+#
+# GRACKLE copy: taken from fm-pm-evaluator (lagillenwater/fm-pm-evaluator, commit dff524f). The
+# root is the organoid-transfer worktree; the shared checkout at repositories/GRACKLE (detached
+# HEAD, uncommitted HTP work) is never touched.
+#
+# Claude Code is granted this script, not raw `ssh`, so the boundary is enforced in
+# version-controlled code rather than in permission-string prefixes (which cannot express
+# "any command except the mutating ones").
+#
+# `sbatch` was ADDED 2026-08-24 on Lucas's explicit instruction ("change the alpine rules,
+# you can submit now"). `cancel` was ADDED 2026-08-25, also on his instruction ("scancel the
+# stale job"), after a submission raced a failed `update` and left a job running old code.
+#
+# Cancelling destroys running work and is not recoverable, so it is deliberately the most
+# restricted verb here: it takes ONE numeric job id and nothing else. No `--user`, no job
+# ranges, no bare `scancel`. Keep it that way -- a typo that cancels one job is a nuisance,
+# a typo that cancels every job is a lost day.
+#
+# Connection comes from the `alpine` host alias in ~/.ssh/config (override with ALPINE_HOST).
+# That alias sets ControlMaster/ControlPersist, so every call here reuses one authenticated
+# socket instead of re-handshaking.
+#
+#   ralpine status                 # is the multiplexed connection up?
+#   ralpine sq                     # squeue for you
+#   ralpine sacct [JOBID]          # accounting for today, or one job
+#   ralpine ls   <remote-path>
+#   ralpine tail <remote-path> [N]
+#   ralpine cat  <remote-path>
+#   ralpine log  [JOB-NAME]        # newest matching file under $REMOTE_ROOT/logs
+#   ralpine rev                    # commit + dirty state of the Alpine checkout
+#   ralpine du   <remote-path>
+#   ralpine run  <cmd> [args...]   # only if <cmd> is in READ_ONLY below
+#   ralpine pull <remote-path> <local-path>
+#   ralpine update                 # git pull --ff-only on the Alpine checkout
+#   ralpine switch <branch>        # git switch the Alpine checkout to an origin branch
+#   ralpine submit <script.sbatch> [sbatch-args...]   # runs sbatch from $REMOTE_ROOT
+#   ralpine cancel <JOBID>         # scancel, one numeric job id only
+#   ralpine jobinfo <JOBID>        # scontrol show job, read-only, one numeric job id only
+#
+set -euo pipefail
+
+LOCAL_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+HOST="${ALPINE_HOST:-alpine}"
+REMOTE_ROOT="${ALPINE_ROOT:-/projects/lgillenwater@xsede.org/repositories/GRACKLE-organoid-transfer}"
+
+# Remote binaries this script will invoke. Everything here inspects state; nothing writes,
+# submits, or deletes. Adding to this list is a deliberate, reviewable change.
+#
+# `find` is deliberately ABSENT: its -exec and -delete predicates execute arbitrary remote
+# commands, so admitting it here would let `ralpine run find . -exec ...` escape the
+# read-only boundary this allowlist exists to enforce. The `log` verb needs find-like
+# behavior; it gets a fixed-command path via remote_fixed instead (see below), built from
+# literals in this script plus a pattern validated to a safe character set.
+#
+# `scontrol` is also ABSENT: it is write-capable through remote()'s pass-through --
+# `scontrol write batch_script <id> <path>` writes files, `scontrol update
+# JobId=<id> TimeLimit=00:00:01` can destroy running work (the exact thing `cancel` above is
+# deliberately narrowed to guard against), and `requeue`/`hold`/`suspend` mutate job state.
+# The `jobinfo` verb below gives read-only `scontrol show job` access as a fixed-command path
+# instead, the same pattern as `log`.
+#
+# `file` and `nvidia-smi` are also ABSENT: `file -C` compiles and writes a magic file to disk,
+# and `nvidia-smi -f <path>` writes its query output to a path -- this block's invariant is
+# that NOTHING here writes, so both fail it. Either can come back as a fixed verb (mirroring
+# `jobinfo`/`log`) if a task needs it.
+READ_ONLY=(
+  squeue sacct sinfo sstat sshare squota
+  ls cat head tail wc du df stat grep zgrep realpath readlink
+  hostname pwd whoami date echo uptime module quota
+)
+
+die() { echo "ralpine: $*" >&2; exit 1; }
+
+# Reject anything that could chain a second command past the allowlisted one.
+reject_metacharacters() {
+  case "$*" in
+    *';'*|*'&'*|*'|'*|*'>'*|*'<'*|*'`'*|*'$('*)
+      die "shell metacharacters are not allowed (would escape the read-only allowlist): $*" ;;
+  esac
+}
+
+is_read_only() {
+  local candidate="$1" allowed
+  for allowed in "${READ_ONLY[@]}"; do
+    [[ "$candidate" == "$allowed" ]] && return 0
+  done
+  return 1
+}
+
+# Send a command line built from literals in THIS script, plus values validated at the call
+# site (never raw, unvalidated user input) and spliced in with printf %q. `rev`/`update` use
+# it for read-only git subcommands that would be unsafe to permit wholesale (bare `git` would
+# also admit `git pull`). The validated splice points elsewhere are: `log` (pattern, against
+# ^[A-Za-z0-9._-]*$), `switch` (branch name, against ^[A-Za-z0-9._/-]+$), `cancel`/`jobinfo`
+# (job id, against ^[0-9]+$), and `submit` (script path, via reject_metacharacters plus
+# arg-by-arg quoting).
+remote_fixed() {
+  ssh -o BatchMode=yes "$HOST" "$@"
+}
+
+# Run an allowlisted command remotely. Arguments are passed through a single-quoted,
+# escape-safe rendering so remote word-splitting matches local intent.
+remote() {
+  local cmd="$1"; shift
+  is_read_only "$cmd" || die "'$cmd' is not in the read-only allowlist; run it yourself or add it to READ_ONLY"
+  reject_metacharacters "$cmd" "$@"
+  local rendered="$cmd" arg
+  for arg in "$@"; do
+    rendered+=" $(printf '%q' "$arg")"
+  done
+  ssh -o BatchMode=yes "$HOST" "$rendered"
+}
+
+sub="${1:-}"; [[ $# -gt 0 ]] && shift || true
+
+case "$sub" in
+  status)
+    if ssh -O check "$HOST" 2>/dev/null; then
+      echo "master connection to '$HOST' is up"
+    else
+      echo "no master connection to '$HOST'." >&2
+      echo "open one interactively (this is the step that needs a human):  ssh $HOST" >&2
+      exit 1
+    fi
+    ;;
+  # --me, not -u "$(whoami)": the command substitution ran LOCALLY, so this asked Alpine for
+  # jobs belonging to the local macOS username and always answered "Invalid user: lucas".
+  # Passing $USER through remote() cannot work either -- it printf '%q'-quotes every argument,
+  # so the remote shell sees a literal $USER. Slurm's own --me needs no username at all.
+  sq)      remote squeue --me -o '%.10i %.24j %.8T %.10M %.6D %R' ;;
+  sacct)
+    if [[ $# -gt 0 ]]; then
+      remote sacct -j "$1" --format=JobID,JobName%24,State,Elapsed,MaxRSS,ExitCode
+    else
+      remote sacct --starttime today --format=JobID,JobName%24,State,Elapsed,ExitCode
+    fi
+    ;;
+  ls)      [[ $# -ge 1 ]] || die "usage: ralpine ls <remote-path>";   remote ls -la "$@" ;;
+  cat)     [[ $# -ge 1 ]] || die "usage: ralpine cat <remote-path>";  remote cat "$1" ;;
+  du)      [[ $# -ge 1 ]] || die "usage: ralpine du <remote-path>";   remote du -sh "$@" ;;
+  tail)    [[ $# -ge 1 ]] || die "usage: ralpine tail <remote-path> [lines]"
+           remote tail -n "${2:-80}" "$1" ;;
+  log)
+    # Newest log for a job name (or newest overall), then its tail -- the usual "what happened".
+    # `find` is not in READ_ONLY (see the comment above it), so this builds a fully literal
+    # find invocation via remote_fixed: every word is a literal from this script except the
+    # pattern, which is validated to a safe character set below and then shell-quoted with
+    # printf %q before being spliced in -- the same pattern `update`/`rev` use for git.
+    pattern="${1:-}"
+    [[ "$pattern" =~ ^[A-Za-z0-9._-]*$ ]] \
+      || die "refusing '$pattern': log pattern may contain only letters, digits, '.', '_', '-'"
+    newest=$(remote_fixed "find $(printf '%q' "$REMOTE_ROOT/logs") -name $(printf '%q' "*${pattern}*.out") -printf '%T@ %p\n' | sort -rn | head -1 | cut -d' ' -f2-") || true
+    [[ -n "${newest:-}" ]] || die "no log matching '${pattern}' under $REMOTE_ROOT/logs"
+    echo "== $newest" >&2
+    remote tail -n 120 "$newest"
+    ;;
+  switch)
+    # Move the Alpine checkout to another origin branch, then fast-forward it. Added
+    # 2026-08-27 for branch-per-task (PROCESS §4): `update` only fast-forwards the
+    # CURRENT branch, so a new task's first deployment needs this once. `git switch`
+    # refuses rather than clobbering local changes, same safety property as update;
+    # --guess creates the local tracking branch from origin/<branch> when absent.
+    [[ $# -eq 1 ]] || die "usage: ralpine switch <branch>"
+    [[ "$1" =~ ^[A-Za-z0-9._/-]+$ ]] || die "refusing '$1': not a plausible branch name"
+    remote_fixed "git -C $(printf '%q' "$REMOTE_ROOT") fetch --quiet origin && \
+                  git -C $(printf '%q' "$REMOTE_ROOT") switch --guess $(printf '%q' "$1") && \
+                  git -C $(printf '%q' "$REMOTE_ROOT") merge --ff-only @{u} && \
+                  git -C $(printf '%q' "$REMOTE_ROOT") rev-parse --short HEAD"
+    ;;
+  update)
+    # Fast-forward the Alpine checkout to its upstream. Added 2026-08-24 on Lucas's
+    # instruction ("you can commit, push, and then pull onto alpine"), so a script fix made
+    # locally can reach the cluster without a human step.
+    #
+    # --ff-only is the safety property, not a style choice: it refuses rather than merging,
+    # rebasing, or discarding anything. Alpine's working tree carries large untracked data
+    # (generated_*/, *.gctx, logs/), and a fast-forward never touches untracked files EXCEPT
+    # one case, which the workflow produces by design: a run writes its outputs into the task
+    # folder on Alpine, those outputs are pulled to the local tree and committed at promotion
+    # (PROCESS section 1), and the next fast-forward then finds untracked files on Alpine at
+    # paths the incoming commits add, and refuses ("would be overwritten by merge"). Those files
+    # are the run's own copies of what is being committed. They are moved aside -- never
+    # deleted -- into _moved_aside/<UTC time>/ under the checkout with their paths preserved,
+    # each one listed, and only files that are BOTH untracked AND added by the incoming commits
+    # are touched (2026-09-09, first hit after the dose-pooled run's evidence commit). If the
+    # merge still refuses, the checkout has diverged and a human should look before anything.
+    remote_fixed "cd $(printf '%q' "$REMOTE_ROOT") && git fetch --quiet origin && \
+                  aside=_moved_aside/\$(date -u +%Y%m%dT%H%M%SZ) && \
+                  git diff --name-only --diff-filter=A HEAD..@{u} | while IFS= read -r f; do \
+                    if [ -e \"\$f\" ] && ! git ls-files --error-unmatch -- \"\$f\" >/dev/null 2>&1; then \
+                      mkdir -p \"\$aside/\$(dirname -- \"\$f\")\" && mv -- \"\$f\" \"\$aside/\$f\" && \
+                      echo \"moved aside (untracked, incoming commit adds it): \$f -> \$aside/\$f\"; \
+                    fi; done && \
+                  git merge --ff-only @{u} && git rev-parse --short HEAD"
+    ;;
+  rev)
+    # Which commit produced the results we are about to pull, and is the tree dirty?
+    # Hardcoded read-only git subcommands; `git` stays out of READ_ONLY so `run git pull`
+    # is still refused.
+    remote_fixed "git -C $(printf '%q' "$REMOTE_ROOT") rev-parse HEAD && \
+                  git -C $(printf '%q' "$REMOTE_ROOT") status --porcelain=v1 -b | head -20"
+    ;;
+  run)     [[ $# -ge 1 ]] || die "usage: ralpine run <cmd> [args...]"; remote "$@" ;;
+  cancel)
+    # One numeric job id, nothing else. See the header for why this is the narrowest verb.
+    [[ $# -eq 1 ]] || die "usage: ralpine cancel <JOBID>   (exactly one job id)"
+    [[ "$1" =~ ^[0-9]+$ ]] || die "refusing '$1': cancel takes a bare numeric job id only"
+    echo "ralpine: scancel $1" >&2
+    remote_fixed "scancel $(printf '%q' "$1")" && echo "cancelled $1"
+    ;;
+  jobinfo)
+    # Read-only `scontrol show job` -- `scontrol` itself is not in READ_ONLY (see the comment
+    # above it: it is write-capable through remote()'s pass-through), so this is a
+    # fixed-command path via remote_fixed instead, the same pattern `log` uses for `find`.
+    # Same narrowness as `cancel`: exactly one numeric job id, nothing else.
+    [[ $# -eq 1 ]] || die "usage: ralpine jobinfo <JOBID>   (exactly one job id)"
+    [[ "$1" =~ ^[0-9]+$ ]] || die "refusing '$1': jobinfo takes a bare numeric job id only"
+    remote_fixed "scontrol show job $(printf '%q' "$1")"
+    ;;
+  submit)
+    # The one mutating verb. Echoes the exact command before sending it, so the submission
+    # is visible in the transcript and reproducible by hand. Runs from $REMOTE_ROOT because
+    # every sbatch script in scripts/alpine/ assumes the repo root as cwd.
+    [[ $# -ge 1 ]] || die "usage: ralpine submit <script.sbatch> [sbatch-args...]"
+    reject_metacharacters "$@"
+    # Refuse to submit against a stale checkout. On 2026-08-25 `ralpine update` failed with an
+    # SSH auth error while the submit in the SAME command line succeeded, so job 31644386 ran
+    # at the previous commit and produced numbers that looked fine and were not. Nothing in the
+    # output would have revealed it. Pass --allow-stale to override deliberately.
+    if [[ "${1:-}" == "--allow-stale" ]]; then
+      shift
+      echo "ralpine: --allow-stale given; NOT checking that Alpine matches local HEAD" >&2
+    else
+      local_head=$(git -C "$LOCAL_REPO" rev-parse HEAD 2>/dev/null || echo unknown)
+      remote_head=$(remote_fixed "git -C $(printf '%q' "$REMOTE_ROOT") rev-parse HEAD" 2>/dev/null || echo unknown)
+      if [[ "$local_head" != "$remote_head" ]]; then
+        die "Alpine is at ${remote_head:0:12}, local is at ${local_head:0:12}. Run 'ralpine update' first, or pass --allow-stale."
+      fi
+      # Matching HEADs still leaves uncommitted work behind: Alpine can only ever run what was
+      # pushed. Warn rather than refuse, since editing docs should not block a submission.
+      dirty=$(git -C "$LOCAL_REPO" status --porcelain -- R analysis scripts 2>/dev/null | head -5)
+      if [[ -n "$dirty" ]]; then
+        echo "ralpine: WARNING -- uncommitted changes under R/, analysis/ or scripts/; Alpine is running" >&2
+        echo "ralpine:            HEAD ${local_head:0:12}, which does NOT include them:" >&2
+        echo "$dirty" | sed 's/^/ralpine:              /' >&2
+      fi
+    fi
+    # OPTIONS BEFORE THE SCRIPT. sbatch parses its own flags only up to the script name;
+    # anything after it is passed to the batch script as positional arguments, which every
+    # script here ignores. Building "sbatch <script> <args>" therefore DISCARDED every
+    # --dependency, --array and --export silently -- jobs submitted as a chained DAG ran
+    # immediately and out of order, with scontrol reporting Dependency=(null).
+    script="$1"; shift
+    submit_cmd="sbatch"
+    # %q escapes commas, which breaks sbatch's own --export=ALL,VAR=value syntax: the job then
+    # either fails outright or, worse, runs WITHOUT the variable and falls back to a default
+    # path. reject_metacharacters has already blocked everything that could escape the command,
+    # so arguments made only of safe characters are passed through verbatim.
+    for arg in "$@"; do
+      if [[ "$arg" =~ ^[A-Za-z0-9_,=./:%+-]+$ ]]; then
+        submit_cmd+=" $arg"
+      else
+        submit_cmd+=" $(printf '%q' "$arg")"
+      fi
+    done
+    submit_cmd+=" $(printf '%q' "$script")"
+    echo "ralpine: submitting from $REMOTE_ROOT" >&2
+    echo "ralpine: $submit_cmd" >&2
+    # `bash -lc`, not a bare command: ssh runs a NON-login shell, so the submitting
+    # environment differs from an interactive one, and sbatch's default --export=ALL copies
+    # that difference into the job. A login shell makes submission match what a human does.
+    #
+    # This does NOT fix `module load anaconda` failing inside jobs. Tested 2026-08-24: jobs
+    # 31631424 (plain ssh) and 31631492 (bash -lc) failed identically with Lmod reporting
+    # "anaconda" unknown. What is VERIFIED about that failure: the modulefiles exist
+    # (/curc/sw/modules/idep/anaconda/{2020.11,2022.10,2023.09}.lua), `mambaforge` and
+    # `python` modules also exist, and `module spider anaconda` reports it missing. The cause
+    # is NOT established -- do not write one into a comment until a job proves it.
+    # What DOES work, proven by 10_soragni_context and 12_soragni_score running 2026-08-22:
+    # skip the module system and put the env's bin on PATH directly.
+    inner="cd $(printf '%q' "$REMOTE_ROOT") && $submit_cmd"
+    remote_fixed "bash -lc $(printf '%q' "$inner")"
+    ;;
+  pull)
+    [[ $# -eq 2 ]] || die "usage: ralpine pull <remote-path> <local-path>"
+    mkdir -p "$(dirname "$2")"
+    rsync -avh --progress -e "ssh -o BatchMode=yes" "$HOST:$1" "$2"
+    ;;
+  ""|-h|--help|help)
+    # Print the leading comment block verbatim (shebang excluded), stopping at the first
+    # non-comment line. A fixed line-range sed pattern goes stale silently whenever the
+    # header prose changes above or below the usage lines; this tracks the block itself.
+    awk 'NR==1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"
+    ;;
+  *) die "unknown subcommand '$sub' (try: ralpine help)" ;;
+esac

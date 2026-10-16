@@ -106,3 +106,15 @@ test_that("an organoid's pair partner comes from the included tumors", {
   pt <- pairTable(s[s$included, ])
   expect_setequal(paste(pt$tumor, pt$organoid), c("f01 f03", "f12 f14", "f13 f14"))
 })
+
+test_that("cancer type is one value per case, falling back to the ICD site in the HCMI id", {   # makeFolds needs one type per case
+  x <- hcmi_inputs()
+  x$clinical$cancer_type[x$clinical$sample_id == "A-01A"] <- NA          # case A: only the organoid carries COAD
+  x$clinical$cancer_type[x$clinical$sample_id %in% c("H-01A", "H-06A", "H-85A")] <- NA   # case H: no code anywhere
+  s <- buildSampleTable(x$gdc, x$clinical)$samples
+  per_case <- tapply(s$cancer_type, s$case_id, function(v) length(unique(v)))
+  expect_true(all(per_case == 1))
+  expect_equal(unique(s$cancer_type[s$case_id == "A"]), "COAD")
+  expect_equal(unique(s$cancer_type[s$case_id == "H"]), "site:C18")
+  expect_false(anyNA(s$cancer_type))
+})

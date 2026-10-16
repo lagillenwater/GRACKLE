@@ -130,7 +130,7 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
   - **Medium:** `CULTURE_MEDIA`.
   - **Passage:** GDC `passage_count`.
   - **Derivation center:** the center code in the HCMI ID (`HCM-BROD-...` gives `BROD`).
-  - **Cancer type:** `DIAGNOSIS_TCGA_HCMI_CODE`.
+  - **Cancer type:** `DIAGNOSIS_TCGA_HCMI_CODE`, set per case as the most frequent code among its samples. When a case has none, the ICD-O site in its HCMI id is used (for example `site:C18`). One value per case is required by the folds.
   - **Prior treatment:** `TREATMENT_STATUS == "Treated"`.
   - **Age and sex:** `AGE`, `SEX`.
   - **Ancestry annotation:** `RACE_CATEGORY` (reported race category, not the paper's genetic ancestry estimate).
@@ -194,7 +194,7 @@ Four arms, each a single source, all over the final gene set:
 - `combined_score / 1000` with no threshold, as in `tests/HTP_v2.R`. The diagonal is 0 rather than 1, which leaves the objective unchanged.
 
 ### 4.6 Purity requirement
-- Graph purity must be **DNA-based**: `purity_dna` is the median of the available DNA callers (`PURITY_ABSOULTE`, `PURITY_ASCAT`, `PURITY_HACHET`, `PURITY_PURPLE`) for each tumor sample. Agreement with cBioPortal's `CONSENSUS_PURITY` is reported.
+- Graph purity must be **DNA-based**: `purity_dna` is the median of the available DNA callers (`PURITY_ABSOULTE`, `PURITY_ASCAT`, `PURITY_HACHET`, `PURITY_PURPLE`) for each tumor sample. cBioPortal's `CONSENSUS_PURITY` is not a purity estimate in this study: it reads about 0.1-0.35 where all four DNA callers agree near 0.8-0.9, with r = -0.31 against ABSOLUTE (checked 2026-10-15). So agreement among the four DNA callers (median pairwise r) is reported instead.
 - **If no DNA-based tumor purity is available, the pipeline stops after step 02 and the user decides.** RNA-derived purity in the graph would be circular.
 
 ---

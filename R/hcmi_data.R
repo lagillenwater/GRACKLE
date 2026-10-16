@@ -58,8 +58,9 @@ selectGenes <- function(logexpr, n = 5000) {
 #' Applies the inclusion rules of spec Section 4.2 in order, recording the counts after each
 #' step: expanded models and non-tumor samples out; 3D organoids only; the FFPE rule; one
 #' profile per sample; parent-tumor pairing by tumor descriptor; organoids without a tumor
-#' partner out. Organoids inherit their parent tumor's annotations; tumors get DNA purity as
-#' the median of the four DNA callers.
+#' partner out. Cancer type is set per case (most frequent code, else the ICD-O site in the HCMI id).
+#' Organoids inherit their parent tumor's annotations; tumors get DNA purity as the median of the
+#' four DNA callers.
 #' @param gdc GDC file metadata: profile_id, case_id, case_submitter_id, sample_submitter_id, sample_type, tumor_descriptor, preservation_method, passage_count.
 #' @param clinical cBioPortal fields per sample.
 #' @return A list with samples (every profile, with included and exclusion_reason) and filter_counts.
@@ -110,7 +111,16 @@ buildSampleTable <- function(gdc, clinical) {
   pt <- pairTable(s[is.na(s$exclusion_reason), , drop = FALSE])
   exclude(s$role %in% "organoid" & !(s$profile_id %in% pt$organoid), "no included tumor partner")
   record("paired organoids and all tumors")
-  ann <- data.frame(cancer_type = cl$cancer_type,
+  ## Cancer type is a property of the case: the most frequent code among its samples, else the
+  ## ICD-O site carried in the HCMI id (e.g. "site:C18"). makeFolds() needs one value per case.
+  case_code <- tapply(cl$cancer_type, s$case_id, function(v) {
+    v <- v[!is.na(v) & nzchar(v)]
+    if (length(v)) names(sort(table(v), decreasing = TRUE))[1] else NA_character_
+  })
+  case_type <- unname(case_code[s$case_id])
+  site <- paste0("site:", sub("^HCM-[A-Z]{4}-[0-9]{4}-([A-Z][0-9]{2}).*$", "\\1", s$case_submitter_id))
+  case_type <- ifelse(is.na(case_type), site, case_type)
+  ann <- data.frame(cancer_type = case_type,
                     prior_treatment = ifelse(is.na(cl$treatment_status), NA, cl$treatment_status == "Treated"),
                     age = suppressWarnings(as.numeric(cl$age)), sex = cl$sex, ancestry = cl$race_category,
                     stringsAsFactors = FALSE)
