@@ -42,3 +42,13 @@ test_that("combineArm selects, scores and excludes incomplete settings without e
   expect_true(all(out$per_type$n_pairs >= 10))
   expect_equal(nrow(out$convergence), length(b$res))
 })
+
+## Combine job 34347703: three string_all settings had no stable program, and paste0("LV", integer(0))
+## is "LV", not character(0), so scoring indexed a column that does not exist.
+test_that("scoreSetting returns no rows when no program is stable", {
+  oof <- matrix(c(1, 2, 3, 4), 2, dimnames = list(c("t1", "o1"), c("LV1", "LV2")))
+  samples <- data.frame(profile_id = c("t1", "o1"), cancer_type = "X", fold = 1)
+  stability <- data.frame(ref = 1:2, stable = c(FALSE, FALSE))
+  out <- scoreSetting(oof, data.frame(tumor = "t1", organoid = "o1"), samples, stability, n_perm = 9, n_boot = 9)
+  expect_equal(nrow(out), 0)
+})

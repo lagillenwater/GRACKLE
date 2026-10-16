@@ -82,7 +82,7 @@ pairActivities <- function(oof, pairs, samples, program) {
 #' @return One row per stable program with the persistence columns, conc_fdr, ret_fdr and group.
 #' @export
 scoreSetting <- function(oof, pairs, samples, stability, n_perm = 10000, n_boot = 2000, seed = 1) {
-  stable <- paste0("LV", stability$ref[stability$stable])
+  stable <- sprintf("LV%d", stability$ref[stability$stable])   # paste0() would turn no programs into "LV"
   if (!length(stable)) return(data.frame())
   res <- do.call(rbind, lapply(stable, function(lv) {
     pa <- pairActivities(oof, pairs, samples, lv)
