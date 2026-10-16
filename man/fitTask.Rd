@@ -14,7 +14,7 @@ fitTask(
   fold,
   train_role = c("all", "tumor"),
   test_role = c("all", "organoid"),
-  iterations = 2000,
+  iterations = 20000,
   diff_threshold = 1e-06,
   dtype = "float32",
   k_nn = 10

@@ -48,7 +48,7 @@ priorAway <- function(score, prior = .string_prior) {
 #' @param links Data frame from [readStringLinks()] (channels on the 0-1000 scale).
 #' @param channels Channel names; each `<channel>_transferred` column is included when present.
 #' @param prior STRING's prior. Default 0.041.
-#' @return Numeric vector in [0, 1]; 0 where no selected channel has evidence.
+#' @return Numeric vector between 0 and 1; 0 where no selected channel has evidence.
 #' @export
 stringRecombine <- function(links, channels = c("experiments", "database"), prior = .string_prior) {
   per_channel <- vapply(channels, function(ch) {

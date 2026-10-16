@@ -18,7 +18,7 @@ stringRecombine(
 \item{prior}{STRING's prior. Default 0.041.}
 }
 \value{
-Numeric vector in \link{0, 1}; 0 where no selected channel has evidence.
+Numeric vector between 0 and 1; 0 where no selected channel has evidence.
 }
 \description{
 Recombines selected STRING evidence channels with STRING's procedure: remove the prior
