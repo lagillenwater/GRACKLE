@@ -106,7 +106,12 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
   - the GDC publication page `HCMI-CMDC-2026` hosts only file manifests, so the paper's Supplementary Table 1 is not needed;
   - the cBioPortal datahub S3 archive returns 403, so the API is used.
 - **STRING v12** (`9606.protein.links.full.v12.0.txt`, `9606.protein.links.v12.0.txt`, `9606.protein.aliases.v12.0.txt`). The full-links file carries the per-channel scores.
-- **DepMap** (one pinned public release): `CRISPRGeneEffect` (Chronos), model metadata (growth pattern, HCMI identifiers), the non-essential control gene list, and the NextGen 3D screens. **The DepMap portal blocks scripted downloads** (a bot-verification page, checked 2026-10-15). The user downloads these files in a browser and syncs them to `raw/manual/depmap/`. `01_download.R` verifies they are present and records sha256 and the release name.
+- **DepMap** (checked 2026-10-15). The DepMap portal blocks scripted downloads with a bot-verification page, but DepMap mirrors releases on figshare.
+  - **Scripted from figshare, with md5 checks:**
+    - DepMap 24Q4 Public (figshare+, CC BY 4.0, doi 10.25452/figshare.plus.27993248): `CRISPRGeneEffect.csv`, `Model.csv`, `AchillesNonessentialControls.csv`.
+    - The NextGen manuscript metadata (CC BY 4.0, doi 10.6084/m9.figshare.29472362): `model_metadata.csv` and `screen_metadata.csv`, which give each screen's culture format (`CRISPRScreenType`).
+  - **Manual, by the user:** the genome-wide NextGen gene effects exist only in the portal file set "NextGen Model Manuscript 2026". The user downloads it in a browser into `raw/manual/depmap_nextgen/`; `01_download.R` verifies it and records sha256.
+  - **Which matrix each arm uses:** if the NextGen gene-effect matrix also covers the traditional 2D screens (one Chronos run), it supplies both co-essentiality arms, so the 2D/3D contrast is not confounded by processing. Otherwise the 2D arm uses 24Q4.
 - **Sanger HCMI organoid CRISPR screens** (Herranz-Ors et al. 2026), from their deposited gene-level scores. Downloaded by script if a direct URL exists; otherwise by the user into `raw/manual/sanger/`, the same way as DepMap.
 - **OncoKB cancer gene list** (`https://www.oncokb.org/api/v1/utils/cancerGeneList.txt`, public, checksummed). It defines which genes count as drivers for the genotype annotation.
 - **Gene annotation:** HGNC complete set, the pinned 2024-10-01 file `ensemblToHGNC` already uses. It supplies symbols, Ensembl and Entrez IDs, and the cytogenetic `location` used for chromosome arms.
@@ -170,8 +175,8 @@ Four arms, each a single source, all over the final gene set:
 
 **`coess_2d` and `coess_3d`.**
 1. **Models.**
-   - 2D: DepMap models whose growth pattern is not organoid or spheroid, excluding every HCMI-derived model.
-   - 3D: organoid and spheroid screens. If DepMap NextGen and Sanger scores cannot be put on one scale (checked at implementation), use the larger source alone. For each fold, the screens of models from that fold's held-out cases are removed before the graph is built. The reference fit uses all 3D screens.
+   - 2D: traditional screens (`CRISPRScreenType == "2DS"`; in 24Q4, growth pattern Adherent, Suspension or Mixed), excluding every HCMI-derived model.
+   - 3D: NextGen screens run in 3D culture, `CRISPRScreenType` 3DO (dome organoids, 94) or 3DN (CNS spheroids, 14). This uses the screen's culture format, not the model's derivation format. NextGen models screened in 2D coat culture (2DO, 2DN) are in neither arm. If DepMap NextGen and Sanger scores cannot be put on one scale (checked at implementation), use the larger source alone. For each fold, the screens of models from that fold's held-out cases are removed before the graph is built. The reference fit uses all 3D screens.
 2. **Informative genes.** A gene gets edges only if the SD of its Chronos scores across the arm's models exceeds the 95th percentile of SDs among DepMap's non-essential control genes. Without this filter, the nearest-neighbor step would give noise-only genes random edges.
 3. **Nuisance correction.** GLS whitening across models (Wainberg et al. 2021, *Nat Genet*): estimate the model-by-model covariance from all genes and whiten the model dimension by its inverse square root. This removes shared line-level structure such as screen quality and proliferation.
 4. **Similarity.** GLS correlation between informative genes: the cosine of their whitened profiles after projecting out the whitened intercept (`1' * Sigma^(-1/2)`). This is the GLS analogue of a Pearson correlation; plain centering after whitening would leave each gene's mean effect as a shared pattern and correlate strongly essential genes with each other. Pairs on the same chromosome arm are set to 0 to remove CRISPR proximity artifacts; the arm comes from the cytogenetic `location` field of the pinned HGNC file (e.g., `17q21.31` gives `17q`). Negative values are set to 0.
@@ -182,7 +187,7 @@ Four arms, each a single source, all over the final gene set:
   1. For each channel, `s' = max(0, (s / 1000 - 0.041) / (1 - 0.041))`.
   2. Combine: `c = 1 - prod(1 - s')`.
   3. Add the prior back: `c * (1 - 0.041) + 0.041`.
-- **Unit-tested:** recombining all channels with the same procedure reproduces `combined_score` (to within 1 on the 0-1000 scale). For this test, direct and transferred scores are combined per channel, and the co-occurrence and text-mining channels get STRING's homology correction.
+- **Unit-tested:** recombining all channels with the same procedure reproduces `combined_score` (to within 1 on the 0-1000 scale). For this test, direct and transferred scores are combined per channel. No homology correction is applied, because the published channel scores already carry it (checked on the v12 file).
 - Weight = recombined score; no threshold.
 
 **`string_all`.**
