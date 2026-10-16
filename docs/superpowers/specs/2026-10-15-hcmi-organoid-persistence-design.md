@@ -104,8 +104,9 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
 - **Supplementary Table 1** from the GDC publication page `HCMI-CMDC-2026`. If it is not hosted there, the user places the Nature supplementary file in `raw/manual/`; the script verifies it is present and records its sha256.
 - **cBioPortal `pancan_hcmi_2025`:** mutation calls and sample clinical data, used for genotype annotation only.
 - **STRING v12** (`9606.protein.links.full.v12.0.txt`, `9606.protein.links.v12.0.txt`, `9606.protein.aliases.v12.0.txt`). The full-links file carries the per-channel scores.
-- **DepMap** (one pinned public release): `CRISPRGeneEffect` (Chronos), model metadata (growth pattern, HCMI identifiers), the non-essential control gene list, and the NextGen 3D screens.
-- **Sanger HCMI organoid CRISPR screens** (Herranz-Ors et al. 2026), from their deposited gene-level scores.
+- **DepMap** (one pinned public release): `CRISPRGeneEffect` (Chronos), model metadata (growth pattern, HCMI identifiers), the non-essential control gene list, and the NextGen 3D screens. **The DepMap portal blocks scripted downloads** (a bot-verification page, checked 2026-10-15). The user downloads these files in a browser and syncs them to `raw/manual/depmap/`. `01_download.R` verifies they are present and records sha256 and the release name.
+- **Sanger HCMI organoid CRISPR screens** (Herranz-Ors et al. 2026), from their deposited gene-level scores. Downloaded by script if a direct URL exists; otherwise by the user into `raw/manual/sanger/`, the same way as DepMap.
+- **OncoKB cancer gene list** (`https://www.oncokb.org/api/v1/utils/cancerGeneList.txt`, public, checksummed). It defines which genes count as drivers for the genotype annotation.
 - **Gene annotation:** HGNC complete set, the pinned 2024-10-01 file `ensemblToHGNC` already uses. It supplies symbols, Ensembl and Entrez IDs, and the cytogenetic `location` used for chromosome arms.
 - **MSigDB Hallmark** via `msigdbr`, with the package version pinned and the gene sets cached as an RDS file.
 
@@ -119,7 +120,9 @@ All steps run on Alpine (Section 11). Raw data goes in `/projects/$USER/grackle_
   - bookkeeping: `fold`, `included`, `exclusion_reason`
 - **Included organoids:** profiles whose model type is "3D organoid" in Supplementary Table 1.
 - **Included tumors:** all tumor profiles with RNA. That covers primary, metastatic and recurrent tumors, human tumor original cells, and failed-derivation tumors.
-- **FFPE:** a profile from an FFPE-preserved sample (`preservation_method == "FFPE"`, including slides and FFPE scrolls) is included only when no frozen profile exists for the same tumor sample. The paper attributes some low concordance to FFPE artifacts. The preservation method is kept as a column.
+- **FFPE:** a profile from an FFPE-preserved sample (`preservation_method == "FFPE"`, including slides and FFPE scrolls) is included only when no frozen profile exists for the same tumor sample. "Same tumor sample" means the same case and the same `tumor_descriptor`, because slides and scrolls get their own sample IDs. The paper attributes some low concordance to FFPE artifacts. The preservation method is kept as a column.
+- **Duplicate profiles:** when one sample has more than one RNA profile, the profile with the lexicographically first `profile_id` is kept and the rest are excluded ("duplicate profile of the same sample"). This keeps a patient from entering the pairs twice through re-sequencing.
+- **Unpaired organoids:** 3D organoids with no included tumor partner are excluded, following the training-set decision in Section 3.
 - **Pairing:**
   - An organoid pairs with the tumor sample it was derived from (`parent_sample_id` from Supplementary Table 1).
   - If the parent sample is not recorded, it pairs with every tumor sample of the case, and the case is flagged.
@@ -344,7 +347,7 @@ The fixture has about 60 pairs, 3 cancer types, 500 genes and a random gene grap
   - ESTIMATE stromal and immune scores (`tidyestimate`, computed on tumor log2 TPM) are reported as supporting columns.
   - **Positive control:** microenvironment-associated programs are expected to drop out.
 - **Genotype:**
-  - Drivers mutated in at least 10 included tumors.
+  - Drivers are OncoKB cancer genes. A tumor counts as mutated for a gene if it has a non-silent mutation (missense, nonsense, frameshift, in-frame indel, splice site, nonstop or translation-start). Only genes mutated in at least 10 included tumors, with at least 2 wild-type tumors, are tested.
   - Wilcoxon test of tumor-side activity, mutated vs. wild type, with BH across program x gene.
   - Annotation only.
 
@@ -457,7 +460,7 @@ New exported functions get roxygen documentation, and `NAMESPACE` and `man/` are
 - The unused `@import dynutils` is removed.
 - `@useDynLib GRACKLE`, `LinkingTo: Rcpp` and `R/RcppExports.R` are removed. That file calls compiled code, and there is no `src/` directory.
 
-New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `jsonlite`. New `Suggests`: `tidyestimate`, `testthat (>= 3.0.0)`, `withr`.
+New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `jsonlite`, `withr` (seeded RNG without touching the caller's state). New `Suggests`: `tidyestimate`, `testthat (>= 3.0.0)`.
 
 ---
 
@@ -500,6 +503,7 @@ New `Imports`: `tensorflow`, `nnls`, `cluster`, `clue`, `irlba`, `data.table`, `
 | Non-converged fits | Listed in `convergence.csv`; settings with any non-converged fold are excluded from selection |
 | Most programs unstable | Reported as a result; the k/2 sensitivity run shows whether a smaller rank is reproducible |
 | Small cancer types | Pooled statistic still valid; the per-type view is limited to types with at least 10 held-out pairs |
+| DepMap or Sanger files can't be downloaded by script | The user downloads them in a browser and runs one `rsync` to `raw/manual/`; `01_download.R` verifies them and records checksums |
 | DepMap NextGen and Sanger 3D screens can't be put on one scale | `coess_3d` uses the larger source alone; recorded in `gene_graph_summary.csv` |
 | Few informative genes among the final 5,000 | Reported in `gene_graph_summary.csv`. Genes without edges are unsmoothed by design, and graph sparsity is part of the arm comparison |
 | HCMI models not cleanly flagged in DepMap metadata | Match HCMI model IDs (`HCM-*`) against DepMap model names and aliases; unmatched IDs are listed. The 2D exclusion and the 3D per-fold removal use this mapping |
