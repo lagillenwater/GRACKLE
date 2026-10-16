@@ -316,7 +316,7 @@ For each stable program j, the inputs are the held-out pairs (t, o) from every f
 - **Persists:** not reduced and concordant.
 - **Present, not patient-specific:** not reduced and not concordant.
 
-**Detection limit.** Each program reports the 95th percentile of its concordance null. The synthetic fixture supplies the power curve.
+**Detection limit and power.** Each program reports the 95th percentile of its concordance null. The power curve of the concordance test comes from a simulation at the run's real held-out pair structure (cancer type x fold counts), giving power against true concordance (`compare/power_curve.csv`). The synthetic fixture checks that planted programs are recovered.
 
 **Per-type view.** Concordance is computed within each cancer type that has at least 10 held-out pairs. Smaller types contribute to the pooled statistic but are not shown separately.
 
@@ -449,8 +449,14 @@ R/
   tuning.R               # lambdaFromAlpha(), selectSetting()
   folds.R                # makeFolds()
   program_matching.R     # matchPrograms(), matchNull(), programStability()
-  persistence.R          # concordance, retention, nulls, bootstrap, detection limit, groups
+  persistence.R          # concordance, retention, nulls, bootstrap, detection limit, groups, power curve
   annotation.R           # enrichment, purity/ESTIMATE, genotype
+  cross_fitting.R        # fitTask(): the core of 05_fit.R
+  combine.R              # combineArm(): the core of 06_combine.R
+  compare.R              # transfer table, 2D/3D map agreement
+  fixture.R              # synthetic fixture and its expected calls
+  hcmi_data.R            # GDC STAR parsing, buildSampleTable()
+  depmap_data.R          # DepMap/Sanger parsing, 3D source combination
   Evaluation.R           # existing project_W (reused)
 analysis/hcmi_persistence/
   config.R, 01_download.R, 02_sample_table.R, 03_expression.R, 03b_gene_graphs.R,
