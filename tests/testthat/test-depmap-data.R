@@ -78,3 +78,14 @@ test_that("dropUnidentifiedModels drops models absent from every model table", {
   expect_equal(out$dropped, "ACH-9")
   expect_equal(dropUnidentifiedModels(E, colnames(E))$dropped, character(0))
 })
+
+test_that("verifyManualFiles stops on a missing file or a checksum mismatch", {
+  d <- withr::local_tempdir()
+  f <- file.path(d, c("a.csv", "b.csv"))
+  writeLines("x", f[1]); writeLines("y", f[2])
+  md5 <- unname(tools::md5sum(f))
+  expect_silent(verifyManualFiles(f, md5))
+  expect_error(verifyManualFiles(f, c(md5[1], "0123")), "md5 mismatch.*b\\.csv")
+  expect_error(verifyManualFiles(c(f, file.path(d, "c.csv")), c(md5, md5[1])), "missing.*c\\.csv")
+  expect_silent(verifyManualFiles(f, NULL))   # a table without an md5 column checks presence only
+})

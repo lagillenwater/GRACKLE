@@ -133,3 +133,21 @@ dropUnidentifiedModels <- function(effect, known) {
   keep <- colnames(effect) %in% known
   list(effect = effect[, keep, drop = FALSE], dropped = colnames(effect)[!keep])
 }
+
+#' verifyManualFiles
+#'
+#' Checks browser-downloaded inputs against the md5 values pinned in their table, so a download
+#' from another release, or a truncated one, stops step 01 instead of reaching the gene graphs.
+#' @param paths File paths.
+#' @param md5 Expected md5 per path, or NULL to check presence only.
+#' @return `paths`, invisibly.
+#' @export
+verifyManualFiles <- function(paths, md5 = NULL) {
+  missing <- !file.exists(paths)
+  if (any(missing)) stop("missing manual downloads: ", paste(basename(paths[missing]), collapse = ", "))
+  if (!is.null(md5)) {
+    bad <- unname(tools::md5sum(paths)) != md5
+    if (any(bad)) stop("md5 mismatch for manual downloads: ", paste(basename(paths[bad]), collapse = ", "))
+  }
+  invisible(paths)
+}
