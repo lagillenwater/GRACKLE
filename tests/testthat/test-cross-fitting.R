@@ -44,3 +44,11 @@ test_that("misaligned inputs are rejected", {
   fx <- small_fixture()
   expect_error(fitTask(fx$Y[, 40:1], fx$samples, fx$G, 2, 0.1, 0.1, 1), "aligned")
 })
+
+## Run 20261016_d53b86d: at a 2,000-iteration cap every fit stopped unconverged (relative change
+## 4e-6 to 1.2e-4), so the spec's exclusion rule would have removed every setting. Probes on the
+## real data converged at 1e-6 within 3,480-10,417 iterations; the cap leaves twice that margin.
+test_that("fitTask's iteration cap leaves room for the slowest settings to converge", {
+  expect_equal(formals(fitTask)$iterations, 20000)
+  expect_equal(formals(fitTask)$diff_threshold, 1e-6)
+})

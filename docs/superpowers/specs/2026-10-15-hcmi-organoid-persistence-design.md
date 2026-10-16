@@ -206,7 +206,7 @@ The objective, the multiplicative updates, the inputs and the SVD-based initiali
 1. **Loss bookkeeping matches the objective.**
    - Compute `||Y - WH||_F^2 + lambda_1 tr(W' L_p W) + lambda_2 tr(H L_g H')`.
    - This replaces the unsquared norm and the `reduce_sum` over all matrix entries in the current code (lines 85-96 before the loop, 123-139 inside it).
-2. **`iterations` is honored** as the maximum number of iterations, replacing the hard-coded `1:292`. The analysis uses `iterations = 2000` and `diff_threshold = 1e-6` (relative change in the objective).
+2. **`iterations` is honored** as the maximum number of iterations, replacing the hard-coded `1:292`. The analysis uses `iterations = 20000` and `diff_threshold = 1e-6` (relative change in the objective). *Changed 2026-10-16 from 2,000: at that cap every fit of run 20261016_d53b86d stopped unconverged, so the Section 7.3 exclusion rule would have removed every setting. Probes on the real data converged within 3,480-10,417 iterations.*
 3. **Convergence is reported.** The return list gains `loss_trace` (a data frame of iteration, reconstruction, sample-graph term, gene-graph term and total), `n_iter` and `converged`.
 4. **Precision.** A `dtype` argument defaults to `"float32"`. `"float16"` stays available. The global Keras `mixed_float16` policy side effect and the NaN/Inf float32 fallbacks are removed.
 5. **Fail-fast.** The `while(!success) tryCatch(...)` retry loops are removed, so errors stop the job.
@@ -286,7 +286,7 @@ For each arm:
 ### 8.1 Cross-fitting (`05_fit.R`)
 Sections 8.1-8.3 run identically within each of the four gene-graph arms (Section 4.5). For each arm, setting and fold f:
 1. **Training set:** all included samples not in fold f. Build `S` (Section 6), take the arm's gene graph (for `coess_3d`, fold f's version), set lambda (Section 7.2), and run `svdInit` on the training Y.
-2. **Fit and normalize:** fit GRACKLE (`dtype = "float32"`, `iterations = 2000`, `diff_threshold = 1e-6`). Normalize each row of H to unit L2 norm.
+2. **Fit and normalize:** fit GRACKLE (`dtype = "float32"`, `iterations = 20000`, `diff_threshold = 1e-6`; see Section 5 for why the cap is 20,000). Normalize each row of H to unit L2 norm.
 3. **Project:** project fold f's tumors and organoids **separately** onto H with `project_W` (NNLS).
 
 **Reference fit.** Each setting also gets one reference fit on all included samples. It is used only for program identity (names, gene loadings, enrichment, figures) and **never contributes a score**.

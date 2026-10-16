@@ -27,7 +27,7 @@ normalizeRows <- function(H) {
 #' @export
 fitTask <- function(Y, samples, gene_graph, k, alpha_1, alpha_2, fold,
                     train_role = c("all", "tumor"), test_role = c("all", "organoid"),
-                    iterations = 2000, diff_threshold = 1e-6, dtype = "float32", k_nn = 10) {
+                    iterations = 20000, diff_threshold = 1e-6, dtype = "float32", k_nn = 10) {
   train_role <- match.arg(train_role)
   test_role <- match.arg(test_role)
   if (!identical(rownames(Y), samples$profile_id) || !identical(colnames(Y), rownames(gene_graph))) {
