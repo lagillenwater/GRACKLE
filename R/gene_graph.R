@@ -179,7 +179,8 @@ informativeGenes <- function(effect, nonessential, quantile = 0.95) {
 #'
 #' Whitens the model dimension by `Sigma^(-1/2)`, where `Sigma` is the model-by-model
 #' covariance estimated across all genes (Wainberg et al. 2021). Missing values are replaced
-#' by the gene's mean. Eigenvalues are floored at `ridge * max`.
+#' by the gene's mean. A gene with no value in any model is left out of the covariance and
+#' returned as NA. Eigenvalues are floored at `ridge * max`.
 #' @param effect Genes x models matrix.
 #' @param ridge Relative eigenvalue floor. Default 1e-8.
 #' @return Whitened genes x models matrix with attribute `"intercept"`: the whitened
@@ -189,10 +190,12 @@ glsWhiten <- function(effect, ridge = 1e-8) {
   E <- effect
   na <- is.na(E)
   if (any(na)) E[na] <- rowMeans(E, na.rm = TRUE)[row(E)[na]]
-  ev <- eigen(stats::cov(E), symmetric = TRUE)
+  seen <- rowSums(!na) > 0
+  ev <- eigen(stats::cov(E[seen, , drop = FALSE]), symmetric = TRUE)
   vals <- pmax(ev$values, ridge * max(ev$values))
   W_half <- ev$vectors %*% (t(ev$vectors) / sqrt(vals))
   out <- E %*% W_half
+  out[!seen, ] <- NA_real_
   dimnames(out) <- dimnames(effect)
   attr(out, "intercept") <- colSums(W_half)
   out

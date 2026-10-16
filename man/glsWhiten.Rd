@@ -18,5 +18,6 @@ all-ones vector (\code{colSums(Sigma^(-1/2))}), needed by \code{\link[=glsCorrel
 \description{
 Whitens the model dimension by \code{Sigma^(-1/2)}, where \code{Sigma} is the model-by-model
 covariance estimated across all genes (Wainberg et al. 2021). Missing values are replaced
-by the gene's mean. Eigenvalues are floored at \code{ridge * max}.
+by the gene's mean. A gene with no value in any model is left out of the covariance and
+returned as NA. Eigenvalues are floored at \code{ridge * max}.
 }

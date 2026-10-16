@@ -73,3 +73,20 @@ test_that("dropHeldOutModels removes only the held-out cases' models", {
   expect_true(all(c("M2", "M3") %in% colnames(out)))
   expect_equal(ncol(out), 29)   # 30 models minus caseA's one
 })
+
+## Job 34346127: 276 genes have no value in any DepMap 3D screen (absent from that library), which
+## made the whitening covariance NaN and stopped coess_3d.
+test_that("glsWhiten and coessGraph tolerate genes with no value in any model", {
+  E <- toy_effect()
+  E_na <- rbind(E, A1 = NA_real_)
+  W <- glsWhiten(E_na)
+  expect_true(all(is.na(W["A1", ])))
+  expect_equal(W[rownames(E), ], glsWhiten(E), ignore_attr = TRUE)
+  expect_equal(attr(W, "intercept"), attr(glsWhiten(E), "intercept"))
+  arm <- c(G1 = "1p", G2 = "1p", G3 = "2q", G4 = "3q", G5 = "4p")
+  genes <- c(paste0("G", 1:5), "A1")
+  G <- coessGraph(E_na, genes, nonessential = paste0("N", 1:12), arm = arm, k_nn = 3)
+  expect_false(anyNA(G))
+  expect_equal(sum(G["A1", ]), 0)
+  expect_gt(G["G3", "G4"], 0)
+})
