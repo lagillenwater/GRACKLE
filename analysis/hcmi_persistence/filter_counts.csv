@@ -1,0 +1,7 @@
+step,n_profiles,n_cases,n_tumors,n_organoids
+all RNA profiles,1153,781,466,666
+tumors and original models,1132,781,466,666
+3D organoids and tumors,834,631,466,368
+FFPE rule,834,631,466,368
+one profile per sample,834,631,466,368
+paired organoids and all tumors,655,455,466,189
