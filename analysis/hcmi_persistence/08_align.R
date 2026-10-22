@@ -152,17 +152,10 @@ describe <- function(id) {
   tree <- stats::hclust(stats::dist(Z), method = "ward.D2")
   cl <- stats::cutree(tree, k = k_clusters)
   ## Per cluster, every stable program standardized over all samples, so programs lost in organoids show.
-  Zall <- standardize(stable, FALSE)
-  means <- function(r) rowsum(Zall[role == r, , drop = FALSE], cl[role == r]) / as.vector(table(cl[role == r]))
-  zt <- means("tumor")
-  zo <- means("organoid")
-  both <- intersect(rownames(zt), rownames(zo))
-  long <- data.frame(cluster = rep(both, times = ncol(Zall)), program = rep(colnames(Zall), each = length(both)),
-                     tumor_z = as.vector(zt[both, , drop = FALSE]), organoid_z = as.vector(zo[both, , drop = FALSE]))
+  long <- clusterActivity(out$oof[, stable, drop = FALSE], role, cl)
   long$group <- out$programs$group[match(long$program, out$programs$program)]
   long$reactome <- label[long$program]
-  long$status <- ifelse(long$tumor_z > 0.5 & long$organoid_z > 0.5, "transfers",
-                        ifelse(long$tumor_z > 0.5 & long$organoid_z < 0, "lost", ""))
+  long <- long[, c("cluster", "program", "tumor_z", "organoid_z", "group", "reactome", "status")]
   pc <- data.frame(cluster = names(table(cl)), n_tumors = as.vector(table(factor(cl[role == "tumor"], names(table(cl))))),
                    n_organoids = as.vector(table(factor(cl[role == "organoid"], names(table(cl))))),
                    pairs_together = as.vector(table(factor(cl[pr$organoid][cl[pr$organoid] == cl[pr$tumor]],

@@ -85,6 +85,37 @@ enrichmentStrength <- function(g) {
   stats::median(tapply(g$nes, g$program, max, na.rm = TRUE))
 }
 
+#' clusterActivity
+#'
+#' Mean program activity of the tumors and of the organoids in each sample cluster. Activity is
+#' log1p-transformed and each program standardized over all samples, so a program every organoid loses
+#' reads low in each cluster's organoids. A program transfers in a cluster when both means exceed `high`,
+#' and is lost when the tumors' mean exceeds `high` and the organoids' is below zero.
+#' @param A Samples x programs activity (out-of-fold W).
+#' @param role "tumor" or "organoid" for each row of `A`.
+#' @param cluster Sample cluster for each row of `A`.
+#' @param high Threshold on the standardized mean.
+#' @return Data frame with cluster, program, tumor_z, organoid_z and status ("transfers", "lost" or ""),
+#'   for the clusters that hold both tumors and organoids.
+#' @export
+clusterActivity <- function(A, role, cluster, high = 0.5) {
+  Z <- scale(log1p(A))
+  Z[is.na(Z)] <- 0                               # unmatched in a sample's fold, or no variance
+  means <- function(r) {
+    s <- rowsum(Z[role == r, , drop = FALSE], cluster[role == r])
+    s / as.vector(table(cluster[role == r])[rownames(s)])
+  }
+  zt <- means("tumor")
+  zo <- means("organoid")
+  both <- intersect(rownames(zt), rownames(zo))
+  out <- data.frame(cluster = rep(both, times = ncol(Z)), program = rep(colnames(Z), each = length(both)),
+                    tumor_z = as.vector(zt[both, , drop = FALSE]), organoid_z = as.vector(zo[both, , drop = FALSE]),
+                    stringsAsFactors = FALSE)
+  out$status <- ifelse(out$tumor_z > high & out$organoid_z > high, "transfers",
+                       ifelse(out$tumor_z > high & out$organoid_z < 0, "lost", ""))
+  out
+}
+
 #' controlHolds
 #'
 #' The persistence map's positive control (spec Section 9): among stable programs, microenvironment

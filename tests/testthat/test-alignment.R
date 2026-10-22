@@ -79,3 +79,20 @@ test_that("enrichmentStrength is the median over programs of each program's best
                   nes = c(1, 2, 1.5, 0.5, 3), p = 0.01, fdr = 0.02)
   expect_equal(enrichmentStrength(g), 2)              # best per program 2, 1.5, 3
 })
+
+## Programs that transfer in a sample cluster are read off the cluster's tumor and organoid means, with
+## each program standardized over all samples so a program every organoid loses reads low in organoids.
+test_that("clusterActivity averages standardized activity by cluster and role and marks transfers and losses", {
+  A <- cbind(P1 = c(9, 9, 0, 0, 9, 9, 0, 0), P2 = c(0, 0, 9, 9, 0, 0, 0, 0), P3 = 1)
+  role <- rep(c("tumor", "organoid"), each = 4)
+  cl <- c(1, 1, 2, 2, 1, 1, 2, 2)
+  out <- clusterActivity(A, role, cl)
+  expect_named(out, c("cluster", "program", "tumor_z", "organoid_z", "status"))
+  Z <- scale(log1p(A))
+  expect_equal(out$tumor_z[out$cluster == "2" & out$program == "P2"], mean(Z[3:4, "P2"]))
+  expect_equal(out$organoid_z[out$cluster == "1" & out$program == "P1"], mean(Z[5:6, "P1"]))
+  expect_equal(out$status[out$program == "P1"], c("transfers", ""))
+  expect_equal(out$status[out$program == "P2"], c("", "lost"))
+  expect_equal(out$tumor_z[out$program == "P3"], c(0, 0))   # no variance reads as 0, not NA
+  expect_equal(unique(clusterActivity(A, role, c(1, 1, 2, 2, 1, 1, 1, 1))$cluster), "1")  # cluster 2 has no organoids
+})
