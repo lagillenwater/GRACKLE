@@ -29,19 +29,49 @@ pairingScore <- function(W, samples) {
              score = 1 - (closer + 0.5 * ties) / (length(tumors) - 1), stringsAsFactors = FALSE)
 }
 
+#' gseaPrograms
+#'
+#' Preranked GSEA (fgsea, one-sided for high loadings) of every program against every gene set, using
+#' each gene's loading rather than a top-gene cut-off. Seeded per program, so results do not depend on
+#' `cores`.
+#' @param H Programs x genes loadings.
+#' @param gene_sets Named list of gene symbol vectors.
+#' @param min_size,max_size Gene-set size limits (genes present in `H`).
+#' @param seed Random seed.
+#' @param cores Parallel workers over programs.
+#' @return Data frame with program, gene_set, nes, p and fdr (BH over all programs and sets).
+#' @export
+gseaPrograms <- function(H, gene_sets, min_size = 10, max_size = 500, seed = 1, cores = 1) {
+  run <- function(i) {
+    x <- stats::setNames(H[i, ], colnames(H))
+    r <- NULL
+    utils::capture.output(r <- withr::with_seed(seed + i, suppressWarnings(
+      fgsea::fgsea(gene_sets, x, scoreType = "pos", minSize = min_size, maxSize = max_size, nproc = 1))))
+    data.frame(program = rep(rownames(H)[i], nrow(r)), gene_set = r$pathway, nes = r$NES, p = r$pval,
+               stringsAsFactors = FALSE)
+  }
+  out <- do.call(rbind, parallel::mclapply(seq_len(nrow(H)), run, mc.cores = cores))
+  out$fdr <- stats::p.adjust(out$p, "BH")
+  out
+}
+
 #' enrichedShare
 #'
-#' Share of programs whose top genes are enriched for at least one gene set ([enrichHypergeom()]).
+#' Share of programs enriched for at least one gene set: by preranked GSEA ([gseaPrograms()], the
+#' default) or by over-representation of each program's top genes ([enrichHypergeom()]).
 #' @param H Programs x genes loadings.
 #' @param gene_sets Named list of gene symbol vectors.
 #' @param fdr BH threshold.
-#' @param frac Fraction of genes used as each program's top set.
+#' @param frac Fraction of genes used as each program's top set (method "ora").
+#' @param method "gsea" or "ora".
+#' @param cores Parallel workers (method "gsea").
 #' @return A number between 0 and 1.
 #' @export
-enrichedShare <- function(H, gene_sets, fdr = 0.05, frac = 0.05) {
-  e <- enrichHypergeom(H, gene_sets, frac = frac)
-  best <- tapply(e$fdr, e$program, min)
-  mean(best[rownames(H)] < fdr)
+enrichedShare <- function(H, gene_sets, fdr = 0.05, frac = 0.05, method = c("gsea", "ora"), cores = 1) {
+  method <- match.arg(method)
+  e <- if (method == "gsea") gseaPrograms(H, gene_sets, cores = cores) else enrichHypergeom(H, gene_sets, frac = frac)
+  best <- tapply(e$fdr, e$program, min, na.rm = TRUE)
+  mean(best[rownames(H)] < fdr, na.rm = FALSE)
 }
 
 #' balanceSelect

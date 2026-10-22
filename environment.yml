@@ -1,6 +1,7 @@
 name: grackle
 channels:
   - conda-forge
+  - bioconda          # bioconductor-fgsea only
   - nodefaults
 dependencies:
   - python=3.12
@@ -30,6 +31,7 @@ dependencies:
   - r-jsonlite
   - r-httr2
   - r-msigdbr
+  - bioconductor-fgsea=1.36
   - r-readxl
   - r-withr
   - r-devtools

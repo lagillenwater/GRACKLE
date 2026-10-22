@@ -4,7 +4,14 @@
 \alias{enrichedShare}
 \title{enrichedShare}
 \usage{
-enrichedShare(H, gene_sets, fdr = 0.05, frac = 0.05)
+enrichedShare(
+  H,
+  gene_sets,
+  fdr = 0.05,
+  frac = 0.05,
+  method = c("gsea", "ora"),
+  cores = 1
+)
 }
 \arguments{
 \item{H}{Programs x genes loadings.}
@@ -13,11 +20,16 @@ enrichedShare(H, gene_sets, fdr = 0.05, frac = 0.05)
 
 \item{fdr}{BH threshold.}
 
-\item{frac}{Fraction of genes used as each program's top set.}
+\item{frac}{Fraction of genes used as each program's top set (method "ora").}
+
+\item{method}{"gsea" or "ora".}
+
+\item{cores}{Parallel workers (method "gsea").}
 }
 \value{
 A number between 0 and 1.
 }
 \description{
-Share of programs whose top genes are enriched for at least one gene set (\code{\link[=enrichHypergeom]{enrichHypergeom()}}).
+Share of programs enriched for at least one gene set: by preranked GSEA (\code{\link[=gseaPrograms]{gseaPrograms()}}, the
+default) or by over-representation of each program's top genes (\code{\link[=enrichHypergeom]{enrichHypergeom()}}).
 }

@@ -32,6 +32,7 @@ Imports:
     utils,
     withr
 Suggests:
+    fgsea,
     NMF,
     PLIER,
     sgnesR,

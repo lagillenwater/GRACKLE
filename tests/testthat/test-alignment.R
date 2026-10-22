@@ -28,7 +28,21 @@ test_that("enrichedShare counts the programs with a significant gene set", {
   H <- rbind(LV1 = c(rep(10, 10), rep(0, 190)), LV2 = c(rep(0, 190), rep(10, 10)))
   colnames(H) <- genes
   sets <- list(A = genes[1:20])
-  expect_equal(enrichedShare(H, sets), 0.5)
+  expect_equal(enrichedShare(H, sets, method = "ora"), 0.5)
+})
+
+## Smoothed programs spread their loadings, which a top-5% overlap test penalizes; GSEA uses every gene's rank.
+test_that("enrichedShare with GSEA finds the program whose highest loadings sit on a gene set", {
+  skip_if_not_installed("fgsea")
+  genes <- paste0("g", 1:200)
+  rest <- withr::with_seed(5, stats::runif(180, 0, 0.5))
+  H <- rbind(LV1 = c(seq(10, 5, length.out = 20), rest), LV2 = c(rest[1:20], rest[21:180], seq(10, 5, length.out = 20))[1:200])
+  colnames(H) <- genes
+  sets <- list(A = genes[1:20], B = genes[101:120])
+  g <- gseaPrograms(H, sets)
+  expect_named(g, c("program", "gene_set", "nes", "p", "fdr"))
+  expect_lt(g$fdr[g$program == "LV1" & g$gene_set == "A"], 0.05)
+  expect_equal(enrichedShare(H, sets, method = "gsea"), 0.5)
 })
 
 test_that("balanceSelect keeps settings that beat the baseline's pairing and picks the one nearest the ideal", {
