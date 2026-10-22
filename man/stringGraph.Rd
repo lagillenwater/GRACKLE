@@ -4,7 +4,13 @@
 \alias{stringGraph}
 \title{stringGraph}
 \usage{
-stringGraph(links, protein_map, genes, mode = c("mech", "all"))
+stringGraph(
+  links,
+  protein_map,
+  genes,
+  mode = c("mech", "all", "exp"),
+  min_score = 0
+)
 }
 \arguments{
 \item{links}{Data frame from \code{\link[=readStringLinks]{readStringLinks()}}.}
@@ -13,13 +19,18 @@ stringGraph(links, protein_map, genes, mode = c("mech", "all"))
 
 \item{genes}{Character vector of HGNC symbols giving the graph's rows and columns.}
 
-\item{mode}{"mech" or "all".}
+\item{mode}{"mech", "exp" or "all".}
+
+\item{min_score}{Smallest edge score kept (0-1). Default 0 keeps every edge.}
 }
 \value{
 Symmetric genes x genes matrix with a zero diagonal.
 }
 \description{
 Gene-by-gene STRING graph. \code{mode = "mech"} uses the experiments and database channels
-recombined by \code{\link[=stringRecombine]{stringRecombine()}}; \code{mode = "all"} uses combined_score / 1000. Proteins
-that map to the same gene pair are aggregated by max. Genes without edges have zero rows.
+recombined by \code{\link[=stringRecombine]{stringRecombine()}}; \code{mode = "exp"} uses the experiments channel alone (the
+database channel imports curated pathways such as Reactome); \code{mode = "all"} uses
+combined_score / 1000. Proteins that map to the same gene pair are aggregated by max. Edges
+below \code{min_score} are dropped, so a confidence cutoff leaves separate modules rather than one
+tangle. Genes without edges have zero rows.
 }

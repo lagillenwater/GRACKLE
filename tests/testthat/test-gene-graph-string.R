@@ -63,3 +63,17 @@ test_that("graphSummary counts genes, edges and mean degree", {
   s <- graphSummary(G)
   expect_equal(s$n_genes_with_edges, 2); expect_equal(s$n_edges, 1); expect_equal(s$mean_degree, 0.5)
 })
+
+## The database channel imports curated pathways (Reactome among them), and a graph that keeps every
+## weak edge is one tangle; a modular graph from experimental evidence avoids both.
+test_that("stringGraph's exp mode uses only the experiments channel, and min_score drops weak edges", {
+  genes <- c("A", "B", "C", "C2", "D")
+  exp <- stringGraph(toy_links(), toy_map, genes, "exp")
+  expect_equal(exp["A", "B"], 0.4, tolerance = 1e-9)   # experiments 400
+  expect_equal(exp["B", "C"], 0.3, tolerance = 1e-9)   # experiments 300; its database 900 is ignored
+  expect_equal(exp["A", "C"], 0)                       # coexpression only
+  strong <- stringGraph(toy_links(), toy_map, genes, "exp", min_score = 0.35)
+  expect_equal(strong["A", "B"], 0.4, tolerance = 1e-9)
+  expect_equal(strong["B", "C"], 0)
+  expect_true(isSymmetric(strong))
+})

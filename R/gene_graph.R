@@ -89,24 +89,29 @@ stringCombinedAll <- function(links, prior = .string_prior) {
 #' stringGraph
 #'
 #' Gene-by-gene STRING graph. `mode = "mech"` uses the experiments and database channels
-#' recombined by [stringRecombine()]; `mode = "all"` uses combined_score / 1000. Proteins
-#' that map to the same gene pair are aggregated by max. Genes without edges have zero rows.
+#' recombined by [stringRecombine()]; `mode = "exp"` uses the experiments channel alone (the
+#' database channel imports curated pathways such as Reactome); `mode = "all"` uses
+#' combined_score / 1000. Proteins that map to the same gene pair are aggregated by max. Edges
+#' below `min_score` are dropped, so a confidence cutoff leaves separate modules rather than one
+#' tangle. Genes without edges have zero rows.
 #' @param links Data frame from [readStringLinks()].
 #' @param protein_map Output of [stringProteinToSymbol()].
 #' @param genes Character vector of HGNC symbols giving the graph's rows and columns.
-#' @param mode "mech" or "all".
+#' @param mode "mech", "exp" or "all".
+#' @param min_score Smallest edge score kept (0-1). Default 0 keeps every edge.
 #' @return Symmetric genes x genes matrix with a zero diagonal.
 #' @export
-stringGraph <- function(links, protein_map, genes, mode = c("mech", "all")) {
+stringGraph <- function(links, protein_map, genes, mode = c("mech", "all", "exp"), min_score = 0) {
   mode <- match.arg(mode)
   map <- protein_map[protein_map$symbol %in% genes, , drop = FALSE]
   keep <- links$protein1 %in% map$string_protein_id & links$protein2 %in% map$string_protein_id
   links <- links[keep, , drop = FALSE]
   G <- matrix(0, length(genes), length(genes), dimnames = list(genes, genes))
   if (!nrow(links)) return(G)
-  w <- if (mode == "mech") stringRecombine(links) else links$combined_score / 1000
+  w <- switch(mode, mech = stringRecombine(links), exp = stringRecombine(links, channels = "experiments"),
+              all = links$combined_score / 1000)
   e <- data.table::data.table(p1 = links$protein1, p2 = links$protein2, w = w)
-  e <- e[e$w > 0]
+  e <- e[e$w > 0 & e$w >= min_score]
   m <- data.table::data.table(string_protein_id = map$string_protein_id, symbol = map$symbol)
   e <- merge(e, m, by.x = "p1", by.y = "string_protein_id", allow.cartesian = TRUE)
   data.table::setnames(e, "symbol", "g1")
