@@ -81,3 +81,28 @@ test_that("a task result is written whole, and a truncated one reads as missing"
   expect_null(r)
   expect_true(needsFit(r))
 })
+
+## Lambda scaled by the SVD start's reconstruction error (245x a fitted NMF's in a probe) made the
+## smallest joint setting far stronger than its alpha said.
+test_that("fitTask calibrates lambda against a fitted plain NMF, not the SVD start", {
+  skip_if_no_tf()
+  fx <- small_fixture()
+  r <- fitTask(fx$Y, fx$samples, fx$G, k = 2, alpha_1 = 0.1, alpha_2 = 0.1, fold = 1, iterations = 200,
+               dtype = "float64")
+  train <- fx$samples$fold != 1
+  Ytr <- fx$Y[train, ]
+  S <- buildSampleGraph(fx$samples[train, ], k_nn = 10)$S
+  init <- svdInit(Ytr, 2)
+  base <- GRACKLE(Ytr, fx$G, S, diff_threshold = 1e-6, lambda_1 = 0, lambda_2 = 0, k = 2, iterations = 200,
+                  svd_W = init$W, svd_H = init$H, dtype = "float64")
+  expect_equal(r$lambda, lambdaFromAlpha(Ytr, base$W, base$H, S, fx$G, 0.1, 0.1), tolerance = 1e-6)
+})
+
+test_that("fitTask builds the sample graph with the part weights it is given", {
+  skip_if_no_tf()
+  fx <- small_fixture()
+  r <- fitTask(fx$Y, fx$samples, fx$G, k = 2, alpha_1 = 0.1, alpha_2 = 0, fold = 1, iterations = 20,
+               graph_weights = c(pair = 1, annot = 0, purity = 0))
+  expect_equal(r$sample_graph$part, c("pair", "annot", "purity"))
+  expect_equal(r$sample_graph$weight, c(1, 0, 0))
+})

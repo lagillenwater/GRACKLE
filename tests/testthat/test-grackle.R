@@ -65,8 +65,8 @@ test_that("with lambda = 0 GRACKLE equals plain multiplicative-update NMF", {
   fit <- GRACKLE(p$Y, p$S_g, p$S_p, diff_threshold = 0, lambda_1 = 0, lambda_2 = 0, k = p$k,
                  iterations = 25, svd_W = p$init$W, svd_H = p$init$H, dtype = "float64")
   ref <- mu_nmf(p$Y, p$init$W, p$init$H, 25)
-  expect_equal(unname(fit$W), unname(ref$W), tolerance = 1e-8)
-  expect_equal(unname(fit$H), unname(ref$H), tolerance = 1e-8)
+  ## the multiplicative updates are scale-equivariant, so unit-norm rows of H leave W %*% H unchanged
+  expect_equal(unname(fit$W %*% fit$H), unname(ref$W %*% ref$H), tolerance = 1e-8)
 })
 
 test_that("dimnames carry sample and gene names", {
@@ -76,4 +76,19 @@ test_that("dimnames carry sample and gene names", {
   expect_equal(rownames(fit$W), rownames(p$Y))
   expect_equal(colnames(fit$H), colnames(p$Y))
   expect_equal(colnames(fit$W), paste0("LV", 1:3))
+})
+
+## W %*% H is unchanged by W * c, H / c, so a penalty on one factor alone was escaped by shrinking that
+## factor (HCMI run 20261016_6419dd7). Rows of H are held at unit norm, so the penalty must smooth H.
+test_that("a gene-graph penalty alone smooths H instead of shrinking it", {
+  skip_if_no_tf()
+  p <- toy_problem()
+  fit <- function(l2) GRACKLE(p$Y, p$S_g, p$S_p, diff_threshold = 0, lambda_1 = 0, lambda_2 = l2, k = p$k,
+                              iterations = 500, svd_W = p$init$W, svd_H = p$init$H, dtype = "float64")
+  L <- diag(rowSums(p$S_g)) - p$S_g
+  rough <- function(H) sum(diag(H %*% L %*% t(H))) / sum(H^2)
+  plain <- fit(0)
+  smooth <- fit(5)
+  expect_equal(unname(sqrt(rowSums(smooth$H^2))), rep(1, p$k), tolerance = 1e-8)
+  expect_lt(rough(unname(smooth$H)), 0.8 * rough(unname(plain$H)))
 })

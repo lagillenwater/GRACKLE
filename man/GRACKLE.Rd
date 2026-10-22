@@ -18,7 +18,8 @@ GRACKLE(
   iterations = 100,
   svd_W,
   svd_H,
-  dtype = c("float32", "float16", "float64")
+  dtype = c("float32", "float16", "float64"),
+  normalize = TRUE
 )
 }
 \arguments{
@@ -49,6 +50,8 @@ GRACKLE(
 \item{svd_H}{Initial H (k x genes), for example from \code{\link[=svdInit]{svdInit()}}.}
 
 \item{dtype}{TensorFlow precision: "float32" (default), "float16" or "float64".}
+
+\item{normalize}{Hold each row of H at unit norm. Default TRUE.}
 }
 \value{
 A list with \code{W}, \code{H}, \code{svd_W}, \code{svd_H}, \code{loss_trace} (a data frame with columns
@@ -61,4 +64,9 @@ gene-graph penalty on \code{H}, using multiplicative updates. The objective is
 \verb{||Y - WH||_F^2 + lambda_1 tr(W' L_p W) + lambda_2 tr(H L_g H')} with \code{L = D - S} for each
 similarity matrix \code{S}. Fitting stops when the relative change in that objective falls
 below \code{diff_threshold}, or after \code{iterations} iterations.
+}
+\details{
+\code{W \%*\% H} is unchanged by \code{W * c}, \code{H / c}, so without a fixed scale a penalty on one factor
+is escaped by shrinking that factor. With \code{normalize = TRUE} each row of H is held at unit L2
+norm (W absorbs the scale), so both penalties act on the shape of the factors.
 }

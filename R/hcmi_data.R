@@ -142,3 +142,15 @@ buildSampleTable <- function(gdc, clinical) {
   rownames(s) <- NULL
   list(samples = s, filter_counts = do.call(rbind, counts))
 }
+
+#' sexFingerprintGenes
+#'
+#' Genes that mark a donor's sex rather than tumor biology: every Y-linked gene plus XIST and TSIX.
+#' Pseudoautosomal genes (located on both X and Y) are kept. They would pair an organoid with its
+#' tumor by sex alone.
+#' @param hgnc HGNC table with `symbol` and `location` columns.
+#' @return Gene symbols.
+#' @export
+sexFingerprintGenes <- function(hgnc) {
+  hgnc$symbol[grepl("^Y", hgnc$location) | hgnc$symbol %in% c("XIST", "TSIX")]
+}

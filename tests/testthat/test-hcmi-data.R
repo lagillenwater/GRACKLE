@@ -118,3 +118,9 @@ test_that("cancer type is one value per case, falling back to the ICD site in th
   expect_equal(unique(s$cancer_type[s$case_id == "H"]), "site:C18")
   expect_false(anyNA(s$cancer_type))
 })
+
+test_that("sexFingerprintGenes lists Y-linked genes plus XIST and TSIX, not pseudoautosomal ones", {
+  hgnc <- data.frame(symbol = c("RPS4Y1", "XIST", "TSIX", "CD99", "GAPDH", "KDM5D"),
+                     location = c("Yp11.2", "Xq13.2", "Xq13.2", "Xp22.33 and Yp11.2", "12p13.31", "Yq11.223"))
+  expect_setequal(sexFingerprintGenes(hgnc), c("RPS4Y1", "XIST", "TSIX", "KDM5D"))
+})

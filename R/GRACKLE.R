@@ -9,6 +9,10 @@
 #' similarity matrix `S`. Fitting stops when the relative change in that objective falls
 #' below `diff_threshold`, or after `iterations` iterations.
 #'
+#' `W %*% H` is unchanged by `W * c`, `H / c`, so without a fixed scale a penalty on one factor
+#' is escaped by shrinking that factor. With `normalize = TRUE` each row of H is held at unit L2
+#' norm (W absorbs the scale), so both penalties act on the shape of the factors.
+#'
 #' @importFrom Matrix Matrix
 #' @import tensorflow
 #' @param Y Numeric matrix, samples x genes, nonnegative.
@@ -25,13 +29,14 @@
 #' @param svd_W Initial W (samples x k), for example from [svdInit()].
 #' @param svd_H Initial H (k x genes), for example from [svdInit()].
 #' @param dtype TensorFlow precision: "float32" (default), "float16" or "float64".
+#' @param normalize Hold each row of H at unit norm. Default TRUE.
 #' @return A list with `W`, `H`, `svd_W`, `svd_H`, `loss_trace` (a data frame with columns
 #'   iteration, reconstruction, sample_graph, gene_graph, total), `n_iter` and `converged`.
 #' @export
 GRACKLE <- function(Y, net_similarity, patient_similarity, diff_threshold = 1e-4,
                     lambda_1 = .5, lambda_2 = .5, k = 5, verbose = FALSE, beta = 0,
                     error_terms = FALSE, iterations = 100, svd_W, svd_H,
-                    dtype = c("float32", "float16", "float64")) {
+                    dtype = c("float32", "float16", "float64"), normalize = TRUE) {
   dtype <- match.arg(dtype)
   Sys.setenv(TF_ENABLE_ONEDNN_OPTS = "0", TF_CPP_MIN_LOG_LEVEL = "3")
   gpus <- tf$config$list_physical_devices("GPU")
@@ -53,6 +58,13 @@ GRACKLE <- function(Y, net_similarity, patient_similarity, diff_threshold = 1e-4
   l2 <- tf$constant(lambda_2, dtype = tf_dtype)
   ## Guards 0/0 in the multiplicative updates; far below any real denominator.
   eps <- tf$constant(if (dtype == "float16") 1e-7 else 1e-10, dtype = tf_dtype)
+  ## Unit-norm rows of H, with W rescaled so W %*% H is unchanged; zero rows are left as they are.
+  rescale <- function(W, H) {
+    n <- tf$norm(H, axis = 1L, keepdims = TRUE)
+    n <- tf$where(n > 0, n, tf$ones_like(n))
+    list(W = W * tf$transpose(n), H = H / n)
+  }
+  if (normalize) { wh <- rescale(W, H); W <- wh$W; H <- wh$H }
 
   objective <- function(W, H) {
     recon <- tf$reduce_sum(tf$square(wide(Y_tf - tf$matmul(W, H))))
@@ -73,6 +85,7 @@ GRACKLE <- function(Y, net_similarity, patient_similarity, diff_threshold = 1e-4
   for (i in seq_len(iterations)) {
     H <- H * ((tf$matmul(W, Y_tf, transpose_a = TRUE) + l2 * tf$matmul(H, S_g)) /
               (tf$matmul(tf$matmul(W, W, transpose_a = TRUE), H) + l2 * (H * d_g) + eps))
+    if (normalize) { wh <- rescale(W, H); W <- wh$W; H <- wh$H }
     W <- W * ((tf$matmul(Y_tf, H, transpose_b = TRUE) + l1 * tf$matmul(S_p, W)) /
               (tf$matmul(W, tf$matmul(H, H, transpose_b = TRUE)) + l1 * (d_p * W) + eps))
     curr <- objective(W, H)

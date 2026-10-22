@@ -17,7 +17,8 @@ fitTask(
   iterations = 20000,
   diff_threshold = 1e-06,
   dtype = "float32",
-  k_nn = 10
+  k_nn = 10,
+  graph_weights = c(pair = 1, annot = 1, purity = 1)
 )
 }
 \arguments{
@@ -40,12 +41,14 @@ fitTask(
 \item{iterations, diff_threshold, dtype}{Passed to \code{\link[=GRACKLE]{GRACKLE()}}.}
 
 \item{k_nn}{Neighbors in the sample graph.}
+
+\item{graph_weights}{Weights of the sample graph's pair, annot and purity parts (\code{\link[=buildSampleGraph]{buildSampleGraph()}}).}
 }
 \value{
 A list with H, W_test, lambda, n_iter, converged, final_loss, recon_test, train_ids, test_ids.
 }
 \description{
 One cross-fitting task (spec Section 8.1). It builds the sample graph from the training
-samples, scales lambda from alpha, fits GRACKLE, normalizes the rows of H, and projects the
-held-out samples onto H with NNLS.
+samples, fits plain NMF, scales lambda from alpha at that fit, fits GRACKLE from it, and
+projects the held-out samples onto H with NNLS.
 }
