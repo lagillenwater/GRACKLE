@@ -12,14 +12,14 @@
 #
 # One cross-fitting task per array index. ARM and KIND (main | sensitivity | transfer) choose the
 # task table; GRACKLE_RUN_ID names the run. The array size is set at submission: --array=0-215%50
-# for main, 0-11 for sensitivity, 0-9 for transfer. A completed task exits at once, so a failed
+# for main, 0-11 for sensitivity, 0-9 for transfer, 0-197%50 for align (coess_2d). A completed task exits at once, so a failed
 # index is resubmitted alone with --array=<index>.
 set -euo pipefail
 REPO="${REPO:-$SLURM_SUBMIT_DIR}"; cd "$REPO"; source scripts/alpine/env.sh
 : "${ARM:?ARM not set}" "${KIND:?KIND not set}" "${GRACKLE_RUN_ID:?GRACKLE_RUN_ID not set}"
 echo "commit=$(git rev-parse --short HEAD) job=${SLURM_ARRAY_JOB_ID}_${SLURM_ARRAY_TASK_ID} arm=$ARM kind=$KIND run=$GRACKLE_RUN_ID"
-if [[ "$KIND" == "main" ]]; then
-  TASKS="analysis/hcmi_persistence/tasks/main_${ARM}.csv"
+if [[ "$KIND" == "main" || "$KIND" == "align" ]]; then
+  TASKS="analysis/hcmi_persistence/tasks/${KIND}_${ARM}.csv"
 else
   TASKS="$GRACKLE_SCRATCH/$GRACKLE_RUN_ID/tasks/${KIND}_${ARM}.csv"
 fi
