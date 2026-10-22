@@ -2,14 +2,17 @@
 ##   Rscript analysis/hcmi_persistence/08_align.R [--k_clusters 8] [--n_perm 2000] [--n_boot 500] [--cores 8]
 ## Scores every setting in every tasks/align_<arm>.csv (a setting is named <arm>_<setting_id>) on held-out
 ## pairing (pairingScore() on each fold's held-out samples) and on the share of reference-fit programs
-## enriched for a Reactome pathway by preranked GSEA (gseaPrograms(); the top-5% over-representation share
-## is reported beside it), then picks the balanced setting (balanceSelect(); the baseline is plain
-## NMF, alpha_1 = alpha_2 = 0). An arm whose fits are absent leaves its settings ineligible.
+## and on pathway enrichment of the reference-fit programs: enrichmentStrength(), the median best GSEA NES
+## (the GSEA and top-5% enriched shares are reported beside it, as they saturate). balanceSelect() keeps
+## settings that pair better than plain NMF (alpha_1 = alpha_2 = 0) and ranks them by distance to the ideal;
+## walking that order, the first setting whose persistence map passes the positive control (controlHolds(),
+## from a combineArm() with --n_perm_guard permutations) is selected. An arm whose fits are absent leaves
+## its settings ineligible.
 ## For the selected setting and the baseline it runs combineArm() (persistence map) and clusters all
 ## samples on their out-of-fold program activity.
 source("analysis/hcmi_persistence/config.R")
 library(ggplot2)
-args <- parseArgs(list(k_clusters = "8", n_perm = "2000", n_boot = "500", n_perm_match = "1000",
+args <- parseArgs(list(k_clusters = "8", n_perm = "2000", n_boot = "500", n_perm_match = "1000", n_perm_guard = "500",
                        cores = Sys.getenv("SLURM_CPUS_PER_TASK", "1")))
 k_clusters <- as.integer(args$k_clusters)
 tasks <- do.call(rbind, lapply(list.files(file.path(cfg$analysis, "tasks"), pattern = "^align_.*\\.csv$", full.names = TRUE),
@@ -56,14 +59,16 @@ score <- function(id) {
   held <- fits[done & folds > 0]
   ps <- do.call(rbind, lapply(held, function(f) pairingScore(`rownames<-`(f$W_test, f$test_ids), samples)))
   ref <- fits[done & folds == 0]
-  lead <- if (length(ref)) leading(gseaPrograms(ref[[1]]$H, sets, cores = cores), rownames(ref[[1]]$H)) else NA
+  g <- if (length(ref)) gseaPrograms(ref[[1]]$H, sets, cores = cores) else NULL
+  lead <- if (length(ref)) leading(g, rownames(ref[[1]]$H)) else NA
   t1 <- tasks[tasks$key == id, ][1, ]
   data.frame(setting_id = id, arm = t1$arm, sample_graph = t1$sample_graph, alpha_1 = t1$alpha_1, alpha_2 = t1$alpha_2,
              n_fits = sum(done), all_converged = all(conv) && sum(done) == 6,
              pairing = if (length(held)) mean(ps$score) else NA_real_,
              pairing_se = if (length(held)) stats::sd(ps$score) / sqrt(nrow(ps)) else NA_real_,
              own_tumor_first = if (length(held)) mean(ps$score == 1) else NA_real_,
-             enrichment = if (length(ref)) mean(!is.na(lead)) else NA_real_,           # enrichedShare(method = "gsea")
+             enrichment = if (length(ref)) enrichmentStrength(g) else NA_real_,
+             enriched_share = if (length(ref)) mean(!is.na(lead)) else NA_real_,       # enrichedShare(method = "gsea")
              distinct_pathways = if (length(ref)) length(unique(stats::na.omit(lead))) else NA_integer_,
              enrichment_ora = if (length(ref)) enrichedShare(ref[[1]]$H, sets, method = "ora") else NA_real_,
              recon_test = mean(vapply(held, function(f) f$recon_test, numeric(1))),
@@ -73,10 +78,24 @@ tab <- do.call(rbind, lapply(names(results), score))
 tab$baseline <- tab$alpha_1 == 0 & tab$alpha_2 == 0
 tab$eligible <- tab$all_converged & !is.na(tab$pairing) & !is.na(tab$enrichment)
 tab <- balanceSelect(tab)
+## Positive control, walked in order of distance to the ideal; the first setting that passes is selected
+## (it is also the closest of the passing settings that no other passing setting beats on both measures).
+combineSetting <- function(id, n_perm, n_boot) {
+  combineArm(Filter(Negate(is.null), results[[id]]), unique(tasks[tasks$key == id, c("setting_id", "alpha_1", "alpha_2")]),
+             samples, pairs, sets, mut, est, n_perm = n_perm, n_boot = n_boot,
+             n_perm_match = as.integer(args$n_perm_match), seed = cfg$seed, cores = cores)
+}
+tab$control_holds <- NA
+tab$selected <- FALSE
+for (id in tab$setting_id[tab$floor_ok][order(tab$distance[tab$floor_ok])]) {
+  tab$control_holds[tab$setting_id == id] <- controlHolds(combineSetting(id, as.integer(args$n_perm_guard), 200)$programs)
+  message(id, ": positive control ", if (tab$control_holds[tab$setting_id == id]) "holds" else "fails")
+  if (tab$control_holds[tab$setting_id == id]) { tab$selected[tab$setting_id == id] <- TRUE; break }
+}
 fwrite(tab, file.path(out_dir, "settings.csv"))
 writeProvenance(file.path(out_dir, "settings.csv"), inputs = reactome_file)
 print(tab[order(-tab$pairing), c("setting_id", "all_converged", "pairing", "own_tumor_first", "enrichment",
-                                 "distinct_pathways", "enrichment_ora", "floor_ok", "pareto", "selected")], row.names = FALSE)
+                                 "enriched_share", "distinct_pathways", "enrichment_ora", "floor_ok", "control_holds", "selected")], row.names = FALSE)
 selected <- tab$setting_id[tab$selected]
 base_id <- tab$setting_id[tab$baseline]
 if (!length(selected)) message("no setting pairs organoids better than the baseline; describing the baseline only")
@@ -87,16 +106,13 @@ p <- ggplot(tab[tab$eligible, ], aes(pairing, enrichment, colour = sample_graph,
   ggrepel::geom_text_repel(data = tab[tab$selected | tab$baseline, ], aes(label = setting_id), colour = "black",
                            size = 3) +
   labs(x = "Held-out pairing score (1 = own tumor joins first; 0.5 = chance)",
-       y = "Share of programs enriched for a Reactome pathway (GSEA)", colour = "Sample graph", shape = "alpha_2") +
+       y = "Reactome enrichment (median over programs of the best GSEA NES)", colour = "Sample graph", shape = "alpha_2") +
   facet_wrap(~arm) + theme_minimal()
 ggsave(file.path(out_dir, "figures", "tradeoff.png"), p, width = 11, height = 5.5, dpi = 200)
 
 ## 2. Persistence map and clusters for the selected setting and the baseline.
 describe <- function(id) {
-  expected <- unique(tasks[tasks$key == id, c("setting_id", "alpha_1", "alpha_2")])
-  out <- combineArm(Filter(Negate(is.null), results[[id]]), expected, samples, pairs, sets, mut, est,
-                    n_perm = as.integer(args$n_perm), n_boot = as.integer(args$n_boot),
-                    n_perm_match = as.integer(args$n_perm_match), seed = cfg$seed, cores = as.integer(args$cores))
+  out <- combineSetting(id, as.integer(args$n_perm), as.integer(args$n_boot))
   d <- file.path(out_dir, id)
   dir.create(d, showWarnings = FALSE)
   saveRDS(out, file.path(d, "combined.rds"))

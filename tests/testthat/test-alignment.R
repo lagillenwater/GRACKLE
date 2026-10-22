@@ -60,3 +60,22 @@ test_that("balanceSelect selects nothing when no setting beats the baseline", {
                     baseline = c(TRUE, FALSE), eligible = TRUE)
   expect_false(any(balanceSelect(tab)$selected))
 })
+
+## A strong pair graph raised pairing by folding tumor-only programs into shared ones (pair-only alpha_1 >= 1:
+## microenvironment programs no longer dropped out more often than tumor-intrinsic ones).
+test_that("controlHolds is TRUE only when microenvironment programs are lost more often than tumor-intrinsic ones", {
+  p <- data.frame(program = paste0("LV", 1:6), stable = TRUE, microenv = rep(c(TRUE, FALSE), each = 3),
+                  group = c("drops_out", "drops_out", "persists", "persists", "persists", "reduced_concordant"))
+  expect_true(controlHolds(p))                        # 2 of 3 against 1 of 3
+  p$group <- c("drops_out", "persists", "persists", "drops_out", "reduced_concordant", "persists")
+  expect_false(controlHolds(p))                       # 1 of 3 against 2 of 3
+  p$stable[4:5] <- FALSE
+  expect_true(controlHolds(p))                        # unstable programs do not count: 1 of 3 against 0 of 1
+})
+
+## The share of enriched programs saturates under GSEA (95-100% in every setting), so it cannot rank settings.
+test_that("enrichmentStrength is the median over programs of each program's best NES", {
+  g <- data.frame(program = c("LV1", "LV1", "LV2", "LV2", "LV3"), gene_set = c("A", "B", "A", "B", "A"),
+                  nes = c(1, 2, 1.5, 0.5, 3), p = 0.01, fdr = 0.02)
+  expect_equal(enrichmentStrength(g), 2)              # best per program 2, 1.5, 3
+})

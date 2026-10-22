@@ -74,6 +74,32 @@ enrichedShare <- function(H, gene_sets, fdr = 0.05, frac = 0.05, method = c("gse
   mean(best[rownames(H)] < fdr, na.rm = FALSE)
 }
 
+#' enrichmentStrength
+#'
+#' Median over programs of each program's best normalized enrichment score from [gseaPrograms()]. A
+#' graded measure: the share of enriched programs saturates under GSEA.
+#' @param g Output of [gseaPrograms()].
+#' @return A number.
+#' @export
+enrichmentStrength <- function(g) {
+  stats::median(tapply(g$nes, g$program, max, na.rm = TRUE))
+}
+
+#' controlHolds
+#'
+#' The persistence map's positive control (spec Section 9): among stable programs, microenvironment
+#' programs must drop out or be reduced more often than tumor-intrinsic ones. A sample graph strong
+#' enough to fold tumor-only programs into shared ones fails it.
+#' @param programs Program table from [combineArm()] with stable, microenv and group.
+#' @return TRUE or FALSE.
+#' @export
+controlHolds <- function(programs) {
+  p <- programs[programs$stable %in% TRUE, , drop = FALSE]
+  lost <- p$group %in% c("drops_out", "reduced_concordant")
+  m <- p$microenv %in% TRUE
+  isTRUE(mean(lost[m]) > mean(lost[!m]))   # FALSE when either kind is absent
+}
+
 #' balanceSelect
 #'
 #' Picks the setting that balances pairing and pathway enrichment. A setting must pair organoids
