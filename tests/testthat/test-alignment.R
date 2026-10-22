@@ -96,3 +96,19 @@ test_that("clusterActivity averages standardized activity by cluster and role an
   expect_equal(out$tumor_z[out$program == "P3"], c(0, 0))   # no variance reads as 0, not NA
   expect_equal(unique(clusterActivity(A, role, c(1, 1, 2, 2, 1, 1, 1, 1))$cluster), "1")  # cluster 2 has no organoids
 })
+
+## The sample tree in steps 08 and 09 standardizes each program within tumors and within organoids, which
+## removes the shift every organoid shares (its lost microenvironment programs).
+test_that("standardizeActivity scales log1p activity over all samples or within each role, keeping row order", {
+  A <- cbind(P1 = c(1, 3, 5, 10, 20, 40), P2 = c(2, 2, 2, 4, 8, 6))
+  role <- c("tumor", "organoid", "tumor", "organoid", "tumor", "organoid")
+  all <- standardizeActivity(A)
+  expect_equal(all, scale(log1p(A)), ignore_attr = TRUE)
+  w <- standardizeActivity(A, role)
+  expect_equal(dimnames(w), dimnames(A))
+  expect_equal(w[c(1, 3, 5), ], scale(log1p(A[c(1, 3, 5), ])), ignore_attr = TRUE)
+  expect_equal(w[c(2, 4, 6), ], scale(log1p(A[c(2, 4, 6), ])), ignore_attr = TRUE)
+  A[1, 1] <- NA
+  expect_false(anyNA(standardizeActivity(A, role)))    # unmatched in a sample's fold reads as 0
+  expect_equal(standardizeActivity(A, role)[1, "P1"], 0, ignore_attr = TRUE)
+})

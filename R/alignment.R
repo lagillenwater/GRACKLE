@@ -85,6 +85,25 @@ enrichmentStrength <- function(g) {
   stats::median(tapply(g$nes, g$program, max, na.rm = TRUE))
 }
 
+#' standardizeActivity
+#'
+#' Program activity on a common scale: log1p-transformed and each program standardized over all samples,
+#' or separately within each role, which removes the shift every organoid shares (such as its lost
+#' microenvironment programs). Missing values (a program unmatched in a sample's fold) and programs
+#' with no variance read as 0.
+#' @param A Samples x programs activity (out-of-fold W).
+#' @param role Optional role for each row of `A`; when given, programs are standardized within each role.
+#' @return Matrix shaped like `A`, with its dimnames.
+#' @export
+standardizeActivity <- function(A, role = NULL) {
+  L <- log1p(A)
+  idx <- if (is.null(role)) list(seq_len(nrow(L))) else split(seq_len(nrow(L)), role)
+  Z <- do.call(rbind, lapply(idx, function(i) scale(L[i, , drop = FALSE])))[order(unlist(idx)), , drop = FALSE]
+  Z <- matrix(Z, nrow(L), dimnames = dimnames(A))
+  Z[is.na(Z)] <- 0
+  Z
+}
+
 #' clusterActivity
 #'
 #' Mean program activity of the tumors and of the organoids in each sample cluster. Activity is
@@ -99,8 +118,7 @@ enrichmentStrength <- function(g) {
 #'   for the clusters that hold both tumors and organoids.
 #' @export
 clusterActivity <- function(A, role, cluster, high = 0.5) {
-  Z <- scale(log1p(A))
-  Z[is.na(Z)] <- 0                               # unmatched in a sample's fold, or no variance
+  Z <- standardizeActivity(A)
   means <- function(r) {
     s <- rowsum(Z[role == r, , drop = FALSE], cluster[role == r])
     s / as.vector(table(cluster[role == r])[rownames(s)])

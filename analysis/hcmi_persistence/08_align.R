@@ -132,13 +132,7 @@ describe <- function(id) {
   pr <- pairs[pairs$organoid %in% ids & pairs$tumor %in% ids, ]
   ## log1p activity, each program standardized over all samples or separately within tumors and within
   ## organoids (which removes the shift every organoid shares, such as lost microenvironment programs).
-  standardize <- function(keep, within_role) {
-    A <- log1p(out$oof[, keep, drop = FALSE])
-    Z <- if (within_role) do.call(rbind, lapply(split(seq_len(nrow(A)), role), function(i) scale(A[i, , drop = FALSE])))[ids, , drop = FALSE]
-         else scale(A)
-    Z[is.na(Z)] <- 0                               # unmatched in a sample's fold, or no variance within a role
-    Z
-  }
+  standardize <- function(keep, within_role) standardizeActivity(out$oof[, keep, drop = FALSE], if (within_role) role)
   variants <- data.frame(programs = c("transferring", "transferring", "all", "all"), within_role = c(TRUE, FALSE, TRUE, FALSE))
   co <- do.call(rbind, lapply(seq_len(nrow(variants)), function(v) {
     keep <- if (variants$programs[v] == "transferring") transferring else stable
