@@ -1,0 +1,13 @@
+"task_id","arm","mode","setting_id","alpha_1","alpha_2","fold","k_mult","variant","sample_graph","drop_sex"
+"coess_2d_pair-10-0_f0","coess_2d","align","pair-10-0",10,0,0,1,,"pair",TRUE
+"coess_2d_pair-10-0_f1","coess_2d","align","pair-10-0",10,0,1,1,,"pair",TRUE
+"coess_2d_pair-10-0_f2","coess_2d","align","pair-10-0",10,0,2,1,,"pair",TRUE
+"coess_2d_pair-10-0_f3","coess_2d","align","pair-10-0",10,0,3,1,,"pair",TRUE
+"coess_2d_pair-10-0_f4","coess_2d","align","pair-10-0",10,0,4,1,,"pair",TRUE
+"coess_2d_pair-10-0_f5","coess_2d","align","pair-10-0",10,0,5,1,,"pair",TRUE
+"coess_2d_pair-3-0_f0","coess_2d","align","pair-3-0",3,0,0,1,,"pair",TRUE
+"coess_2d_pair-3-0_f1","coess_2d","align","pair-3-0",3,0,1,1,,"pair",TRUE
+"coess_2d_pair-3-0_f2","coess_2d","align","pair-3-0",3,0,2,1,,"pair",TRUE
+"coess_2d_pair-3-0_f3","coess_2d","align","pair-3-0",3,0,3,1,,"pair",TRUE
+"coess_2d_pair-3-0_f4","coess_2d","align","pair-3-0",3,0,4,1,,"pair",TRUE
+"coess_2d_pair-3-0_f5","coess_2d","align","pair-3-0",3,0,5,1,,"pair",TRUE

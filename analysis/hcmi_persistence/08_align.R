@@ -1,8 +1,10 @@
 ## Step 08: choose the pair-alignment setting and describe it.
 ##   Rscript analysis/hcmi_persistence/08_align.R [--k_clusters 8] [--n_perm 2000] [--n_boot 500] [--cores 8]
-## Scores every setting in tasks/align_coess_2d.csv on held-out pairing (pairingScore() on each fold's
-## held-out samples) and on the share of reference-fit programs enriched for a Reactome pathway, then
-## picks the balanced setting (balanceSelect(); the baseline is plain NMF, alpha_1 = alpha_2 = 0).
+## Scores every setting in every tasks/align_<arm>.csv (a setting is named <arm>_<setting_id>) on held-out
+## pairing (pairingScore() on each fold's held-out samples) and on the share of reference-fit programs
+## enriched for a Reactome pathway by preranked GSEA (gseaPrograms(); the top-5% over-representation share
+## is reported beside it), then picks the balanced setting (balanceSelect(); the baseline is plain
+## NMF, alpha_1 = alpha_2 = 0). An arm whose fits are absent leaves its settings ineligible.
 ## For the selected setting and the baseline it runs combineArm() (persistence map) and clusters all
 ## samples on their out-of-fold program activity.
 source("analysis/hcmi_persistence/config.R")
@@ -10,7 +12,9 @@ library(ggplot2)
 args <- parseArgs(list(k_clusters = "8", n_perm = "2000", n_boot = "500", n_perm_match = "1000",
                        cores = Sys.getenv("SLURM_CPUS_PER_TASK", "1")))
 k_clusters <- as.integer(args$k_clusters)
-tasks <- as.data.frame(fread(file.path(cfg$analysis, "tasks", "align_coess_2d.csv")))
+tasks <- do.call(rbind, lapply(list.files(file.path(cfg$analysis, "tasks"), pattern = "^align_.*\\.csv$", full.names = TRUE),
+                                function(f) as.data.frame(fread(f))))
+tasks$key <- paste(tasks$arm, tasks$setting_id, sep = "_")
 out_dir <- file.path(cfg$run, "results", "align")
 dir.create(file.path(out_dir, "figures"), recursive = TRUE, showWarnings = FALSE)
 samples <- readRDS(file.path(cfg$processed, "samples_included.rds"))
@@ -31,17 +35,17 @@ if (!file.exists(reactome_file)) {
 reactome <- readRDS(reactome_file)
 
 ## 1. Score every setting.
-results <- lapply(split(tasks$task_id, tasks$setting_id), function(ids)
-  lapply(file.path(cfg$run, "fits", "coess_2d", "align", paste0(ids, ".rds")), readResult))
+results <- lapply(split(seq_len(nrow(tasks)), tasks$key), function(i)
+  lapply(file.path(cfg$run, "fits", tasks$arm[i], "align", paste0(tasks$task_id[i], ".rds")), readResult))
 genes <- colnames(Filter(Negate(is.null), unlist(results, recursive = FALSE))[[1]]$fit$H)
 sets <- lapply(reactome, intersect, genes)
 sets <- sets[lengths(sets) >= 10 & lengths(sets) <= 500]
-## Reported, not used for selection: how many different pathways lead the enriched programs.
-distinctTop <- function(H) {
-  e <- enrichHypergeom(H, sets)
-  e <- e[e$fdr < 0.05, ]
-  e <- e[order(e$fdr), ]
-  length(unique(e$gene_set[!duplicated(e$program)]))
+cores <- as.integer(args$cores)
+## A program's leading pathway: its most significant one by GSEA (NA when none passes FDR < 0.05).
+leading <- function(g, programs) {
+  g <- g[order(g$fdr), ]
+  g <- g[!duplicated(g$program) & g$fdr < 0.05, ]
+  stats::setNames(g$gene_set[match(programs, g$program)], programs)
 }
 score <- function(id) {
   r <- results[[id]]
@@ -52,14 +56,16 @@ score <- function(id) {
   held <- fits[done & folds > 0]
   ps <- do.call(rbind, lapply(held, function(f) pairingScore(`rownames<-`(f$W_test, f$test_ids), samples)))
   ref <- fits[done & folds == 0]
-  t1 <- tasks[tasks$setting_id == id, ][1, ]
-  data.frame(setting_id = id, sample_graph = t1$sample_graph, alpha_1 = t1$alpha_1, alpha_2 = t1$alpha_2,
+  lead <- if (length(ref)) leading(gseaPrograms(ref[[1]]$H, sets, cores = cores), rownames(ref[[1]]$H)) else NA
+  t1 <- tasks[tasks$key == id, ][1, ]
+  data.frame(setting_id = id, arm = t1$arm, sample_graph = t1$sample_graph, alpha_1 = t1$alpha_1, alpha_2 = t1$alpha_2,
              n_fits = sum(done), all_converged = all(conv) && sum(done) == 6,
              pairing = if (length(held)) mean(ps$score) else NA_real_,
              pairing_se = if (length(held)) stats::sd(ps$score) / sqrt(nrow(ps)) else NA_real_,
              own_tumor_first = if (length(held)) mean(ps$score == 1) else NA_real_,
-             enrichment = if (length(ref)) enrichedShare(ref[[1]]$H, sets) else NA_real_,
-             distinct_pathways = if (length(ref)) distinctTop(ref[[1]]$H) else NA_integer_,
+             enrichment = if (length(ref)) mean(!is.na(lead)) else NA_real_,           # enrichedShare(method = "gsea")
+             distinct_pathways = if (length(ref)) length(unique(stats::na.omit(lead))) else NA_integer_,
+             enrichment_ora = if (length(ref)) enrichedShare(ref[[1]]$H, sets, method = "ora") else NA_real_,
              recon_test = mean(vapply(held, function(f) f$recon_test, numeric(1))),
              n_iter_median = stats::median(vapply(fits[done], function(f) f$n_iter, numeric(1))))
 }
@@ -70,7 +76,7 @@ tab <- balanceSelect(tab)
 fwrite(tab, file.path(out_dir, "settings.csv"))
 writeProvenance(file.path(out_dir, "settings.csv"), inputs = reactome_file)
 print(tab[order(-tab$pairing), c("setting_id", "all_converged", "pairing", "own_tumor_first", "enrichment",
-                                 "distinct_pathways", "floor_ok", "pareto", "selected")], row.names = FALSE)
+                                 "distinct_pathways", "enrichment_ora", "floor_ok", "pareto", "selected")], row.names = FALSE)
 selected <- tab$setting_id[tab$selected]
 base_id <- tab$setting_id[tab$baseline]
 if (!length(selected)) message("no setting pairs organoids better than the baseline; describing the baseline only")
@@ -81,13 +87,13 @@ p <- ggplot(tab[tab$eligible, ], aes(pairing, enrichment, colour = sample_graph,
   ggrepel::geom_text_repel(data = tab[tab$selected | tab$baseline, ], aes(label = setting_id), colour = "black",
                            size = 3) +
   labs(x = "Held-out pairing score (1 = own tumor joins first; 0.5 = chance)",
-       y = "Share of programs enriched for a Reactome pathway", colour = "Sample graph", shape = "alpha_2") +
-  theme_minimal()
-ggsave(file.path(out_dir, "figures", "tradeoff.png"), p, width = 7.5, height = 5.5, dpi = 200)
+       y = "Share of programs enriched for a Reactome pathway (GSEA)", colour = "Sample graph", shape = "alpha_2") +
+  facet_wrap(~arm) + theme_minimal()
+ggsave(file.path(out_dir, "figures", "tradeoff.png"), p, width = 11, height = 5.5, dpi = 200)
 
 ## 2. Persistence map and clusters for the selected setting and the baseline.
 describe <- function(id) {
-  expected <- unique(tasks[tasks$setting_id == id, c("setting_id", "alpha_1", "alpha_2")])
+  expected <- unique(tasks[tasks$key == id, c("setting_id", "alpha_1", "alpha_2")])
   out <- combineArm(Filter(Negate(is.null), results[[id]]), expected, samples, pairs, sets, mut, est,
                     n_perm = as.integer(args$n_perm), n_boot = as.integer(args$n_boot),
                     n_perm_match = as.integer(args$n_perm_match), seed = cfg$seed, cores = as.integer(args$cores))
@@ -96,28 +102,48 @@ describe <- function(id) {
   saveRDS(out, file.path(d, "combined.rds"))
   fwrite(out$programs, file.path(d, "programs.csv"))
   fwrite(out$enrichment, file.path(d, "enrichment.csv"))
-  ## Program label: its most enriched Reactome pathway.
-  e <- out$enrichment[order(out$enrichment$fdr), ]
-  e <- e[!duplicated(e$program), ]
+  ## Program label: its leading Reactome pathway by GSEA.
+  g <- gseaPrograms(out$ref_H, sets, cores = cores)
+  fwrite(g, file.path(d, "gsea.csv"))
   stable <- out$programs$program[out$programs$stable]
-  label <- stats::setNames(ifelse(e$fdr < 0.05, sub("^REACTOME_", "", e$gene_set), "(none)"), e$program)[stable]
-  A <- out$oof[, stable, drop = FALSE]
-  Z <- scale(log1p(A))
-  Z[is.na(Z)] <- 0                                 # a program unmatched in a sample's fold sits at the mean
-  tree <- stats::hclust(stats::dist(Z), method = "ward.D2")
-  ids <- rownames(Z)
-  pr <- pairs[pairs$organoid %in% ids & pairs$tumor %in% ids, ]
-  cuts <- stats::cutree(tree, k = 2:40)
-  co <- data.frame(setting_id = id, k = 2:40,
-                   co_clustered = colMeans(cuts[pr$organoid, , drop = FALSE] == cuts[pr$tumor, , drop = FALSE]))
-  cl <- cuts[, as.character(k_clusters)]
+  lead <- leading(g, rownames(out$ref_H))
+  label <- stats::setNames(ifelse(is.na(lead), "(none)", sub("^REACTOME_", "", lead)), names(lead))
+  ## Programs that transfer: concordant between a donor's tumor and organoid (persists, reduced_concordant).
+  transferring <- out$programs$program[out$programs$stable & out$programs$group %in% c("persists", "reduced_concordant")]
+  if (length(transferring) < 2) transferring <- stable
+  ids <- rownames(out$oof)
   role <- samples$role[match(ids, samples$profile_id)]
-  means <- function(r) rowsum(Z[role == r, , drop = FALSE], cl[role == r]) / as.vector(table(cl[role == r]))
+  pr <- pairs[pairs$organoid %in% ids & pairs$tumor %in% ids, ]
+  ## log1p activity, each program standardized over all samples or separately within tumors and within
+  ## organoids (which removes the shift every organoid shares, such as lost microenvironment programs).
+  standardize <- function(keep, within_role) {
+    A <- log1p(out$oof[, keep, drop = FALSE])
+    Z <- if (within_role) do.call(rbind, lapply(split(seq_len(nrow(A)), role), function(i) scale(A[i, , drop = FALSE])))[ids, , drop = FALSE]
+         else scale(A)
+    Z[is.na(Z)] <- 0                               # unmatched in a sample's fold, or no variance within a role
+    Z
+  }
+  variants <- data.frame(programs = c("transferring", "transferring", "all", "all"), within_role = c(TRUE, FALSE, TRUE, FALSE))
+  co <- do.call(rbind, lapply(seq_len(nrow(variants)), function(v) {
+    keep <- if (variants$programs[v] == "transferring") transferring else stable
+    cuts <- stats::cutree(stats::hclust(stats::dist(standardize(keep, variants$within_role[v])), "ward.D2"), k = 2:40)
+    data.frame(setting_id = id, programs = variants$programs[v], within_role = variants$within_role[v], k = 2:40,
+               n_programs = length(keep), pairs_together = colSums(cuts[pr$organoid, , drop = FALSE] == cuts[pr$tumor, , drop = FALSE]),
+               co_clustered = colMeans(cuts[pr$organoid, , drop = FALSE] == cuts[pr$tumor, , drop = FALSE]))
+  }))
+  ## Primary view: transferring programs, standardized within tumors and within organoids.
+  Z <- standardize(transferring, TRUE)
+  tree <- stats::hclust(stats::dist(Z), method = "ward.D2")
+  cl <- stats::cutree(tree, k = k_clusters)
+  ## Per cluster, every stable program standardized over all samples, so programs lost in organoids show.
+  Zall <- standardize(stable, FALSE)
+  means <- function(r) rowsum(Zall[role == r, , drop = FALSE], cl[role == r]) / as.vector(table(cl[role == r]))
   zt <- means("tumor")
   zo <- means("organoid")
   both <- intersect(rownames(zt), rownames(zo))
-  long <- data.frame(cluster = rep(both, times = ncol(Z)), program = rep(colnames(Z), each = length(both)),
+  long <- data.frame(cluster = rep(both, times = ncol(Zall)), program = rep(colnames(Zall), each = length(both)),
                      tumor_z = as.vector(zt[both, , drop = FALSE]), organoid_z = as.vector(zo[both, , drop = FALSE]))
+  long$group <- out$programs$group[match(long$program, out$programs$program)]
   long$reactome <- label[long$program]
   long$status <- ifelse(long$tumor_z > 0.5 & long$organoid_z > 0.5, "transfers",
                         ifelse(long$tumor_z > 0.5 & long$organoid_z < 0, "lost", ""))
@@ -134,12 +160,12 @@ describe <- function(id) {
   hm$sample <- factor(hm$sample, levels = ids[tree$order])
   pord <- stats::hclust(stats::dist(t(Z)), method = "ward.D2")$order
   hm$program <- factor(hm$program, levels = colnames(Z)[pord],
-                       labels = paste(colnames(Z), substr(label, 1, 40))[pord])
+                       labels = paste(colnames(Z), substr(label[colnames(Z)], 1, 40))[pord])
   ann <- data.frame(sample = factor(ids, levels = levels(hm$sample)), role = role, cluster = factor(cl))
   heat <- ggplot(hm, aes(sample, program, fill = pmax(pmin(z, 3), -3))) + geom_raster() +
     scale_fill_gradient2(low = "#3b6fb6", mid = "white", high = "#c0392b", name = "z") +
     theme_minimal(base_size = 7) + theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
-    labs(x = sprintf("Samples (Ward tree on held-out program activity; %d clusters)", k_clusters), y = NULL,
+    labs(x = sprintf("Samples (Ward tree on held-out activity of transferring programs, standardized within tumors and organoids; %d clusters)", k_clusters), y = NULL,
          title = id)
   strip <- function(fill, values = NULL) {
     g <- ggplot(ann, aes(sample, 1, fill = .data[[fill]])) + geom_raster() + theme_void() +
@@ -155,10 +181,11 @@ describe <- function(id) {
 desc <- lapply(unique(c(selected, base_id)), describe)
 co <- do.call(rbind, lapply(desc, `[[`, "co"))
 fwrite(co, file.path(out_dir, "co_clustering_by_k.csv"))
+co$view <- paste0(co$programs, " programs, ", ifelse(co$within_role, "standardized within tumors / organoids", "standardized over all samples"))
 ggsave(file.path(out_dir, "figures", "co_clustering_by_k.png"),
-       ggplot(co, aes(k, co_clustered, colour = setting_id)) + geom_line() + geom_point(size = 1) +
+       ggplot(co, aes(k, co_clustered, colour = setting_id)) + geom_line() + geom_point(size = 0.8) + facet_wrap(~view) +
          labs(x = "Number of sample clusters (tree cut)", y = "Share of pairs in the same cluster", colour = NULL) +
-         theme_minimal(), width = 7, height = 4.5, dpi = 200)
+         theme_minimal() + theme(legend.position = "bottom"), width = 10, height = 7, dpi = 200)
 groups <- do.call(rbind, lapply(desc, function(x) {
   p <- x$programs[x$programs$stable, ]
   data.frame(setting_id = x$id, as.list(table(factor(p$group, c("persists", "drops_out", "present_not_patient_specific",
