@@ -1,17 +1,19 @@
 ## Step 09: paired tumors and organoids by sample cluster, for the selected pair-alignment setting and the
 ## baseline.
-##   Rscript analysis/hcmi_persistence/09_pair_heatmap.R [--k_clusters 8]
+##   Rscript analysis/hcmi_persistence/09_pair_heatmap.R [--k_clusters 8] [--k_programs 8]
 ## Reads step 08's outputs under results/align (out-of-fold activity in combined.rds, the sample clusters,
 ## the persistence map and the GSEA table); refits nothing. The tree and clusters are step 08's: a Ward tree
 ## on the transferring programs standardized within tumors and within organoids (standardizeActivity()),
 ## cut into k clusters. Rows are the tumors and organoids in a pair, drawn as they sit in that tree
 ## (pruneTree()), with a gap between clusters; each cluster is labeled with the pairs it holds together.
-## Columns are the stable programs that persist or drop out, named by their leading Reactome pathway
-## (preranked GSEA), each group ordered by the cluster where a program peaks.
+## Columns are the stable programs that persist or drop out, cut into k_programs groups by how they rank
+## Reactome pathways (pathwayClusters() on the preranked GSEA), each named by the pathway that sets it apart; within
+## a group, persisting programs come first, each ordered by the cluster where it peaks.
 source("analysis/hcmi_persistence/config.R")
 suppressPackageStartupMessages({ library(ggplot2); library(patchwork) })
-args <- parseArgs(list(k_clusters = "8"))
+args <- parseArgs(list(k_clusters = "8", k_programs = "8"))
 k_clusters <- as.integer(args$k_clusters)
+k_programs <- as.integer(args$k_programs)
 align_dir <- file.path(cfg$run, "results", "align")
 fig_dir <- file.path(align_dir, "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
@@ -35,11 +37,16 @@ theme_set(theme_minimal(base_size = 8) +
 
 ## Reactome names for display: prefix dropped, sentence case with acronyms kept, long names cut.
 acronyms <- c("ADME", "ECM", "HCMV", "RNA", "DNA", "SLC", "GPI", "PCP", "PD", "II", "III", "SPMS", "HFTC", "TP53", "NOTCH1",
-              "AR", "KLK2", "KLK3", "PKN1", "MLL3", "MLL4", "GALNT3", "CD274", "L1", "NMD", "TCA", "ER", "MET", "O")
+              "AR", "KLK2", "KLK3", "PKN1", "MLL3", "MLL4", "GALNT3", "CD274", "L1", "NMD", "TCA", "ER", "MET", "O",
+              "CD3", "TCR", "CENPA", "HATS", "HDACS", "RRNA", "ERCC6", "CSB", "EHMT2", "G9A", "ATR", "TCF", "WNT")
+## Plural acronyms read with a lowercase s.
+plurals <- c(HATS = "HATs", HDACS = "HDACs", SPMS = "SPMs")
 pathwayLabel <- function(x, n = 40) {
   w <- strsplit(sub("^REACTOME_", "", x), "_", fixed = TRUE)
   s <- vapply(w, function(t) {
     t <- ifelse(t %in% acronyms, t, tolower(t))
+    t <- ifelse(t %in% names(plurals), plurals[t], t)
+    t <- sub("^RRNA$", "rRNA", t)
     t[1] <- paste0(toupper(substr(t[1], 1, 1)), substring(t[1], 2))
     paste(t, collapse = " ")
   }, character(1))
@@ -92,24 +99,31 @@ pairHeatmap <- function(id) {
   lab$y <- as.vector(tapply(y, cl[ord], function(v) mean(range(v)))[lab$cluster])
   lab$text <- sprintf("Cluster %s\n%d %s together", lab$cluster, lab$n, ifelse(lab$n == 1, "pair", "pairs"))
 
-  ## Programs that persist or drop out: leading pathway by GSEA, ordered within each group.
+  ## Programs that persist or drop out, grouped by how they rank Reactome pathways, each group named by
+  ## the pathway that sets it apart and the number of its programs where that pathway is significant.
   prog <- prog[prog$group %in% names(group_levels), , drop = FALSE]
+  pc <- pathwayClusters(g, prog$program, k = k_programs)
+  ## Groups run from mostly persisting to mostly dropping out, as the persistence calls did.
+  persist_share <- tapply(prog$group[match(pc$program, prog$program)] == "persists", pc$cluster, mean)
+  first <- pc[!duplicated(pc$cluster), ]
+  first <- first[order(-persist_share[as.character(first$cluster)], first$cluster), ]
+  name_text <- ifelse(is.na(first$label), "No significant pathway", pathwayLabel(first$label, n = 80))
+  head_text <- vapply(seq_along(name_text), function(i)
+    paste(strwrap(c(name_text[i], sprintf("(%d of %d significant)", first$n_sig[i], first$n_programs[i])),
+                  max(9, 7 * first$n_programs[i])), collapse = "\n"), character(1))   # about 7 characters per column
+  prog$pcluster <- factor(pc$cluster[match(prog$program, pc$program)], levels = first$cluster, labels = head_text)
+  prog$label <- ifelse(prog$group == "drops_out", paste(prog$program, "(drops out)"), prog$program)
   ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
+  ## Within a group, persisting programs first, each following the cluster (top to bottom) where it peaks.
   Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
-  g <- g[g$program %in% prog$program & g$fdr < 0.05, ]
-  g <- g[order(g$program, g$fdr, -g$nes), ]
-  lead <- g[!duplicated(g$program), ]
-  prog$label <- paste(prog$program, ifelse(prog$program %in% lead$program,
-                                           pathwayLabel(lead$gene_set[match(prog$program, lead$program)]), "(no pathway)"))
-  ## Within each group, programs follow the cluster (top to bottom) where their mean activity peaks.
   cmean <- rowsum(Z[ord, , drop = FALSE], block) / as.vector(table(block))
-  prog$group <- factor(prog$group, levels = names(group_levels), labels = group_levels)
   peak <- apply(cmean[, prog$program, drop = FALSE], 2, which.max)
-  prog <- prog[order(prog$group, peak, -apply(cmean[, prog$program, drop = FALSE], 2, max)), ]
+  prog <- prog[order(prog$pcluster, match(prog$group, names(group_levels)), peak,
+                     -apply(cmean[, prog$program, drop = FALSE], 2, max)), ]
   hm <- data.frame(y = rep(y, times = ncol(Z)), program = rep(colnames(Z), each = length(ord)),
                    z = as.vector(Z[ord, ]))
   hm$label <- factor(prog$label[match(hm$program, prog$program)], levels = prog$label)
-  hm$group <- prog$group[match(hm$program, prog$program)]
+  hm$pcluster <- prog$pcluster[match(hm$program, prog$program)]
 
   ys <- scale_y_continuous(limits = c(0.5, max(y) + 0.5), expand = c(0, 0))
   bare <- theme(axis.text.y = element_blank(), axis.title.y = element_blank())
@@ -129,17 +143,17 @@ pairHeatmap <- function(id) {
     scale_fill_gradient2(low = diverging[["low"]], mid = diverging[["mid"]], high = diverging[["high"]],
                          limits = c(-2.5, 2.5), breaks = c(-2.5, 0, 2.5), labels = c("-2.5 or less", "0", "2.5 or more"),
                          name = "Program activity\n(SD within tumors\nor within organoids)") +
-    facet_grid(. ~ group, scales = "free_x", space = "free_x") +
+    facet_grid(. ~ pcluster, scales = "free_x", space = "free_x") +
     ys + labs(x = NULL) + bare +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
-          strip.clip = "off", panel.spacing.x = grid::unit(3, "pt"))
+          strip.clip = "off", panel.spacing.x = grid::unit(6, "pt"))
 
   fig <- p_lab + p_tree + p_role + p_hm +
-    plot_layout(widths = c(4, 3, 0.6, nrow(prog)), guides = "collect") &
+    plot_layout(widths = c(3, 2.5, 0.6, nrow(prog)), guides = "collect") &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
-  ggsave(paste0(name, ".pdf"), fig, width = 12, height = 12, device = grDevices::cairo_pdf)
-  ggsave(paste0(name, ".png"), fig, width = 12, height = 12, dpi = 200)
+  ggsave(paste0(name, ".pdf"), fig, width = 14, height = 12, device = grDevices::cairo_pdf)
+  ggsave(paste0(name, ".png"), fig, width = 14, height = 12, dpi = 200)
   message("wrote ", name, ".{pdf,png}")
 }
 invisible(lapply(ids, pairHeatmap))

@@ -170,6 +170,54 @@ clusterActivity <- function(A, role, cluster, high = 0.5) {
   out
 }
 
+#' pathwayClusters
+#'
+#' Groups programs by how they rank gene sets and names each group. Each program ranks every set by its
+#' GSEA NES; programs are joined by Ward linkage on the Euclidean distance between their standardized
+#' rankings (a monotone function of 1 - Spearman correlation), and the tree is cut into `k` groups, or
+#' where the mean silhouette is highest when `k` is NULL. A group is named by the set it ranks highest
+#' relative to the other programs, among the sets significant in at least half its programs (or, when
+#' none is, in the most of them), so a set significant in every program does not win by that alone.
+#' @param g Output of [gseaPrograms()].
+#' @param programs Programs to group (at least three).
+#' @param fdr Significance threshold on `g$fdr`.
+#' @param k Number of groups; NULL chooses it by silhouette.
+#' @param k_max Largest number of groups considered when `k` is NULL.
+#' @return Data frame with program, cluster (numbered along the tree), label (a gene set, NA when no
+#'   program in the group has a significant set), n_sig (programs in the group where the label is
+#'   significant) and n_programs, one row per program in tree order.
+#' @export
+pathwayClusters <- function(g, programs, fdr = 0.05, k = NULL, k_max = 8) {
+  g <- g[g$program %in% programs, , drop = FALSE]
+  sets <- unique(g$gene_set)
+  at <- cbind(match(g$gene_set, sets), match(g$program, programs))
+  N <- matrix(0, length(sets), length(programs), dimnames = list(sets, programs))
+  N[at] <- g$nes
+  S <- matrix(FALSE, length(sets), length(programs), dimnames = list(sets, programs))
+  S[at] <- g$fdr < fdr
+  R <- apply(N, 2, rank) / nrow(N)
+  D <- stats::dist(t(scale(R)))
+  tree <- stats::hclust(D, method = "ward.D2")
+  if (is.null(k)) {
+    ks <- 2:min(k_max, length(programs) - 1)
+    sil <- vapply(ks, function(j) mean(cluster::silhouette(stats::cutree(tree, j), D)[, 3]), numeric(1))
+    k <- ks[which.max(sil)]
+  }
+  cl <- stats::cutree(tree, k)
+  cl <- match(cl, unique(cl[tree$order]))
+  named <- vapply(seq_len(max(cl)), function(k) {
+    inn <- cl == k
+    d <- rowMeans(R[, inn, drop = FALSE]) - rowMeans(R[, !inn, drop = FALSE])
+    n_sig <- rowSums(S[, inn, drop = FALSE])
+    ok <- if (any(n_sig >= sum(inn) / 2)) n_sig >= sum(inn) / 2 else n_sig == max(n_sig) & n_sig > 0
+    best <- names(d)[ok][which.max(d[ok])]
+    if (length(best)) c(best, n_sig[[best]]) else c(NA_character_, "0")
+  }, character(2))
+  o <- tree$order
+  data.frame(program = programs[o], cluster = cl[o], label = named[1, cl[o]], n_sig = as.integer(named[2, cl[o]]),
+             n_programs = as.vector(table(cl))[cl[o]], stringsAsFactors = FALSE)
+}
+
 #' controlHolds
 #'
 #' The persistence map's positive control (spec Section 9): among stable programs, microenvironment

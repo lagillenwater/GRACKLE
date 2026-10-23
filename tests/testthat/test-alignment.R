@@ -129,3 +129,33 @@ test_that("pruneTree keeps the full tree's join heights and leaf order among the
   expect_equal(as.matrix(stats::cophenetic(p))[keep, keep], full)
   expect_false(is.unsorted(p$height))
 })
+
+## Step 09 groups programs by how they rank Reactome pathways and names each group by a pathway that
+## sets it apart; a pathway significant everywhere must not win just by being significant.
+test_that("pathwayClusters groups programs by pathway ranking and labels each group by a distinctive pathway", {
+  set.seed(5)
+  prog <- c("A1", "A2", "A3", "B1", "B2", "B3")
+  sets <- sprintf("S%02d", 1:30)
+  g <- expand.grid(gene_set = sets, program = prog, stringsAsFactors = FALSE)
+  g$nes <- stats::rnorm(nrow(g), 1, 0.1)
+  a <- substr(g$program, 1, 1) == "A"
+  g$nes[a & g$gene_set %in% sprintf("S%02d", 1:5)] <- 3
+  g$nes[!a & g$gene_set %in% sprintf("S%02d", 6:10)] <- 3
+  g$fdr <- 0.5
+  g$fdr[g$gene_set == "S01" & g$program %in% c("A1", "A2")] <- 0.01   # 2 of 3 A programs
+  g$fdr[g$gene_set == "S07" & g$program == "B1"] <- 0.01              # 1 of 3 B programs
+  g$nes[g$gene_set == "S11"] <- 2                                     # ranked alike in every program,
+  g$fdr[g$gene_set == "S11" & g$program %in% c("A1", "A2", "A3", "B1")] <- 0.01   # significant in more A programs than S01
+  pc <- pathwayClusters(g, prog)
+  expect_setequal(pc$program, prog)
+  expect_named(pc, c("program", "cluster", "label", "n_sig", "n_programs"))
+  expect_equal(length(unique(pc$cluster[pc$program %in% c("A1", "A2", "A3")])), 1)
+  expect_equal(length(unique(pc$cluster)), 2)
+  expect_equal(unique(pc$label[pc$program == "A1"]), "S01")
+  expect_equal(unique(pc$n_sig[pc$program == "A1"]), 2)
+  expect_equal(unique(pc$label[pc$program == "B2"]), "S07")             # no set in half: the most widely significant
+  expect_equal(unique(pc$n_sig[pc$program == "B2"]), 1)
+  expect_equal(unique(pc$n_programs), 3)
+  expect_equal(pc$cluster, sort(pc$cluster))                           # rows in tree order, clusters numbered along it
+  expect_equal(length(unique(pathwayClusters(g, prog, k = 4)$cluster)), 4)   # a set number of groups
+})
