@@ -19,10 +19,6 @@ samples <- readRDS(file.path(cfg$processed, "samples_included.rds"))
 pairs <- pairTable(samples)
 tab <- as.data.frame(fread(file.path(align_dir, "settings.csv")))
 ids <- unique(c(tab$setting_id[tab$selected], tab$setting_id[tab$baseline]))
-t1 <- tab[match(ids, tab$setting_id), ]
-title <- stats::setNames(ifelse(t1$baseline, "plain NMF (baseline)",
-                                sprintf("GRACKLE, %s sample graph alpha_1 = %s, %s gene graph alpha_2 = %s",
-                                        t1$sample_graph, t1$alpha_1, t1$arm, t1$alpha_2)), ids)
 
 ## Colors from the dataviz reference palette: diverging blue-red with its neutral midpoint for activity
 ## (fixed limits so the two figures compare directly), neutral inks for role.
@@ -138,9 +134,8 @@ pairHeatmap <- function(id) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
           strip.clip = "off", panel.spacing.x = grid::unit(3, "pt"))
 
-  fig <- (p_lab + p_tree + p_role + p_hm +
-            plot_layout(widths = c(4, 3, 0.6, nrow(prog)), guides = "collect")) +
-    plot_annotation(title = sprintf("Paired tumors and organoids by sample cluster: %s", title[[id]])) &
+  fig <- p_lab + p_tree + p_role + p_hm +
+    plot_layout(widths = c(4, 3, 0.6, nrow(prog)), guides = "collect") &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
   ggsave(paste0(name, ".pdf"), fig, width = 12, height = 12, device = grDevices::cairo_pdf)
