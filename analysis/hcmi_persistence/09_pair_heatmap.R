@@ -28,11 +28,13 @@ ids <- unique(c(tab$setting_id[tab$selected], tab$setting_id[tab$baseline]))
 ## (fixed limits so the two figures compare directly); neutral inks for text and the tree.
 ink <- c(primary = "#0b0b0b", secondary = "#52514e", baseline = "#c3c2b7", surface = "#fcfcfb")
 diverging <- c(low = "#2a78d6", mid = "#f0efec", high = "#e34948")
-gap <- 3   # empty rows between clusters
-theme_set(theme_minimal(base_size = 8) +
+gap <- 6   # empty rows between clusters, room for each cluster's two-line label
+text_pt <- 15   # every label, so the figure reads when set at page width
+theme_set(theme_minimal(base_size = text_pt) +
             theme(panel.grid = element_blank(), text = element_text(colour = ink[["primary"]]),
-                  axis.text = element_text(colour = ink[["secondary"]]),
-                  strip.text = element_text(colour = ink[["primary"]], size = 7),
+                  axis.text = element_text(colour = ink[["primary"]], size = text_pt),
+                  strip.text = element_text(colour = ink[["primary"]], size = text_pt),
+                  legend.text = element_text(size = text_pt - 1),
                   plot.background = element_rect(fill = ink[["surface"]], colour = NA)))
 
 ## Reactome names for display: prefix dropped, sentence case with acronyms and gene symbols (any word with a
@@ -114,8 +116,7 @@ pairHeatmap <- function(id) {
   pc <- pathwayClusters(g, prog$program, k = k_programs)
   first <- pc[!duplicated(pc$cluster), ]
   name_text <- ifelse(is.na(first$label), "No significant pathway", pathwayLabel(first$label, n = 80))
-  head_text <- vapply(seq_along(name_text), function(i)   # about 7 characters per column
-    paste(strwrap(name_text[i], max(9, 7 * first$n_programs[i])), collapse = "\n"), character(1))
+  head_text <- vapply(name_text, function(x) paste(strwrap(x, 28), collapse = "\n"), character(1))   # set upright
   prog$pcluster <- factor(pc$cluster[match(prog$program, pc$program)], levels = first$cluster, labels = head_text)
   ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
   ## Within a group, programs follow the cluster (top to bottom) where they peak.
@@ -131,14 +132,14 @@ pairHeatmap <- function(id) {
   ys <- scale_y_continuous(limits = c(0.5, max(y) + 0.5), expand = c(0, 0))
   bare <- theme(axis.text.y = element_blank(), axis.title.y = element_blank())
   p_lab <- ggplot(lab, aes(x = 1, y = y, label = text)) +
-    geom_text(hjust = 1, size = 2.5, lineheight = 0.9, colour = ink[["primary"]]) +
+    geom_text(hjust = 1, size = text_pt / .pt, lineheight = 0.85, colour = ink[["primary"]]) +
     scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) + ys + coord_cartesian(clip = "off") + labs(x = NULL) + bare +
     theme(axis.text.x = element_blank())
   p_tree <- ggplot(treeSegments(ptree, y[ptree$labels])) +
     geom_segment(aes(x = x, xend = xend, y = y, yend = yend), linewidth = 0.2, colour = ink[["secondary"]]) +
     scale_x_reverse(expand = c(0, 0)) + ys + labs(x = NULL) + bare + theme(axis.text.x = element_blank())
   p_donor <- ggplot(side, aes(x = "Donor", y = y)) + ys + labs(x = NULL) + bare +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]])) +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
     geom_tile(aes(fill = I(donor)), height = 1)
   p_hm <- ggplot(hm, aes(label, y, fill = pmax(pmin(z, 2.5), -2.5))) +
     geom_tile(height = 1) +
@@ -147,15 +148,16 @@ pairHeatmap <- function(id) {
                          name = "Program activity\n(SD within tumors\nor within organoids)") +
     facet_grid(. ~ pcluster, scales = "free_x", space = "free_x") +
     ys + labs(x = NULL) + bare +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
-          strip.clip = "off", panel.spacing.x = grid::unit(6, "pt"))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+          strip.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5, lineheight = 0.9),
+          strip.clip = "off", panel.spacing.x = grid::unit(8, "pt"))
 
   fig <- p_lab + p_tree + p_donor + p_hm +
-    plot_layout(widths = c(3, 2.5, 0.6, nrow(prog)), guides = "collect") &
+    plot_layout(widths = grid::unit(c(2.1, 1.4, 0.35, 1), c("in", "in", "in", "null")), guides = "collect") &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
-  ggsave(paste0(name, ".pdf"), fig, width = 14, height = 12, device = grDevices::cairo_pdf)
-  ggsave(paste0(name, ".png"), fig, width = 14, height = 12, dpi = 200)
+  ggsave(paste0(name, ".pdf"), fig, width = 15, height = 14, device = grDevices::cairo_pdf)
+  ggsave(paste0(name, ".png"), fig, width = 15, height = 14, dpi = 200)
   message("wrote ", name, ".{pdf,png}")
 }
 invisible(lapply(ids, pairHeatmap))
