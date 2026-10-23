@@ -7,6 +7,7 @@
 ## cut into k clusters. Rows are the tumors and organoids in a pair, under a tree that keeps those clusters
 ## and joins each pair within a cluster first (pairedTree()), so a pair the clusters hold together sits on
 ## adjacent rows, tumor above organoid; a gap separates clusters, each labeled with the pairs it holds together.
+## Beside the tree, one color per donor, so a pair reads as a two-row block of one color.
 ## Columns are the stable programs that persist, cut into k_programs groups by how they rank Reactome
 ## pathways (pathwayClusters() on the preranked GSEA), each named by the pathway that sets it apart; within a
 ## group, programs follow the cluster where they peak.
@@ -24,10 +25,9 @@ tab <- as.data.frame(fread(file.path(align_dir, "settings.csv")))
 ids <- unique(c(tab$setting_id[tab$selected], tab$setting_id[tab$baseline]))
 
 ## Colors from the dataviz reference palette: diverging blue-red with its neutral midpoint for activity
-## (fixed limits so the two figures compare directly), neutral inks for role.
+## (fixed limits so the two figures compare directly); neutral inks for text and the tree.
 ink <- c(primary = "#0b0b0b", secondary = "#52514e", baseline = "#c3c2b7", surface = "#fcfcfb")
 diverging <- c(low = "#2a78d6", mid = "#f0efec", high = "#e34948")
-role_cols <- c(Tumor = ink[["secondary"]], Organoid = ink[["baseline"]])
 gap <- 3   # empty rows between clusters
 theme_set(theme_minimal(base_size = 8) +
             theme(panel.grid = element_blank(), text = element_text(colour = ink[["primary"]]),
@@ -51,6 +51,13 @@ pathwayLabel <- function(x, n = 40) {
     paste(t, collapse = " ")
   }, character(1))
   ifelse(nchar(s) > n, paste0(substr(s, 1, n - 1), "…"), s)
+}
+
+## One color per donor, numbered down the page with hues a golden angle apart and three lightness steps,
+## so neighboring donors never share a look.
+donorColors <- function(k) {
+  i <- seq_len(k)
+  grDevices::hcl(h = (i * 137.508) %% 360, c = 65, l = c(52, 72, 62)[(i %% 3) + 1])
 }
 
 ## Tree segments with leaves at x = 0 and leaf i (in label order) at y = leaf_y[i]. Merges are processed
@@ -93,8 +100,8 @@ pairHeatmap <- function(id) {
   block <- cumsum(c(1, diff(cl[ord]) != 0))
   pos <- seq_along(ord) + gap * (block - 1)
   y <- stats::setNames(max(pos) + 1 - pos, ord)
-  r <- role[match(ord, sid)]
-  side <- data.frame(y = y, role = factor(ifelse(r == "tumor", "Tumor", "Organoid"), levels = names(role_cols)))
+  donor <- samples$case_id[match(ord, samples$profile_id)]
+  side <- data.frame(y = y, donor = donorColors(length(unique(donor)))[match(donor, unique(donor))])
   together <- table(factor(cl[pr$tumor][cl[pr$tumor] == cl[pr$organoid]], levels = seq_len(k_clusters)))
   lab <- data.frame(cluster = names(together), n = as.vector(together))
   lab <- lab[lab$cluster %in% cl[ord], ]   # a cluster of unpaired tumors only has no rows
@@ -130,10 +137,9 @@ pairHeatmap <- function(id) {
   p_tree <- ggplot(treeSegments(ptree, y[ptree$labels])) +
     geom_segment(aes(x = x, xend = xend, y = y, yend = yend), linewidth = 0.2, colour = ink[["secondary"]]) +
     scale_x_reverse(expand = c(0, 0)) + ys + labs(x = NULL) + bare + theme(axis.text.x = element_blank())
-  p_role <- ggplot(side, aes(x = "Tumor or organoid", y = y)) + ys + labs(x = NULL) + bare +
+  p_donor <- ggplot(side, aes(x = "Donor", y = y)) + ys + labs(x = NULL) + bare +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]])) +
-    geom_tile(aes(fill = role), height = 1) +
-    scale_fill_manual(values = role_cols, name = NULL)
+    geom_tile(aes(fill = I(donor)), height = 1)
   p_hm <- ggplot(hm, aes(label, y, fill = pmax(pmin(z, 2.5), -2.5))) +
     geom_tile(height = 1) +
     scale_fill_gradient2(low = diverging[["low"]], mid = diverging[["mid"]], high = diverging[["high"]],
@@ -144,7 +150,7 @@ pairHeatmap <- function(id) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
           strip.clip = "off", panel.spacing.x = grid::unit(6, "pt"))
 
-  fig <- p_lab + p_tree + p_role + p_hm +
+  fig <- p_lab + p_tree + p_donor + p_hm +
     plot_layout(widths = c(3, 2.5, 0.6, nrow(prog)), guides = "collect") &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
