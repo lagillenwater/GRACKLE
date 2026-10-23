@@ -100,7 +100,7 @@ pairHeatmap <- function(id) {
   lab$text <- sprintf("Cluster %s\n%d %s together", lab$cluster, lab$n, ifelse(lab$n == 1, "pair", "pairs"))
 
   ## Programs that persist or drop out, grouped by how they rank Reactome pathways, each group named by
-  ## the pathway that sets it apart and the number of its programs where that pathway is significant.
+  ## the pathway that sets it apart.
   prog <- prog[prog$group %in% names(group_levels), , drop = FALSE]
   pc <- pathwayClusters(g, prog$program, k = k_programs)
   ## Groups run from mostly persisting to mostly dropping out, as the persistence calls did.
@@ -108,11 +108,9 @@ pairHeatmap <- function(id) {
   first <- pc[!duplicated(pc$cluster), ]
   first <- first[order(-persist_share[as.character(first$cluster)], first$cluster), ]
   name_text <- ifelse(is.na(first$label), "No significant pathway", pathwayLabel(first$label, n = 80))
-  head_text <- vapply(seq_along(name_text), function(i)
-    paste(strwrap(c(name_text[i], sprintf("(%d of %d significant)", first$n_sig[i], first$n_programs[i])),
-                  max(9, 7 * first$n_programs[i])), collapse = "\n"), character(1))   # about 7 characters per column
+  head_text <- vapply(seq_along(name_text), function(i)   # about 7 characters per column
+    paste(strwrap(name_text[i], max(9, 7 * first$n_programs[i])), collapse = "\n"), character(1))
   prog$pcluster <- factor(pc$cluster[match(prog$program, pc$program)], levels = first$cluster, labels = head_text)
-  prog$label <- ifelse(prog$group == "drops_out", paste(prog$program, "(drops out)"), prog$program)
   ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
   ## Within a group, persisting programs first, each following the cluster (top to bottom) where it peaks.
   Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
@@ -122,7 +120,7 @@ pairHeatmap <- function(id) {
                      -apply(cmean[, prog$program, drop = FALSE], 2, max)), ]
   hm <- data.frame(y = rep(y, times = ncol(Z)), program = rep(colnames(Z), each = length(ord)),
                    z = as.vector(Z[ord, ]))
-  hm$label <- factor(prog$label[match(hm$program, prog$program)], levels = prog$label)
+  hm$label <- factor(hm$program, levels = prog$program)
   hm$pcluster <- prog$pcluster[match(hm$program, prog$program)]
 
   ys <- scale_y_continuous(limits = c(0.5, max(y) + 0.5), expand = c(0, 0))
