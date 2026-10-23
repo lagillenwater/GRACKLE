@@ -6,8 +6,8 @@
 ## on the transferring programs standardized within tumors and within organoids (standardizeActivity()),
 ## cut into k clusters. Rows are the tumors and organoids in a pair, drawn as they sit in that tree
 ## (pruneTree()), with a gap between clusters; each cluster is labeled with the pairs it holds together.
-## Columns are the stable programs, named by their leading Reactome pathway (preranked GSEA) and grouped
-## by persistence call, each group ordered by the cluster where a program peaks.
+## Columns are the stable programs that persist or drop out, named by their leading Reactome pathway
+## (preranked GSEA), each group ordered by the cluster where a program peaks.
 source("analysis/hcmi_persistence/config.R")
 suppressPackageStartupMessages({ library(ggplot2); library(patchwork) })
 args <- parseArgs(list(k_clusters = "8"))
@@ -29,8 +29,7 @@ title <- stats::setNames(ifelse(t1$baseline, "plain NMF (baseline)",
 ink <- c(primary = "#0b0b0b", secondary = "#52514e", baseline = "#c3c2b7", surface = "#fcfcfb")
 diverging <- c(low = "#2a78d6", mid = "#f0efec", high = "#e34948")
 role_cols <- c(Tumor = ink[["secondary"]], Organoid = ink[["baseline"]])
-group_levels <- c(persists = "Persists", reduced_concordant = "Reduced,\nconcordant",
-                  present_not_patient_specific = "Present, not\npatient-specific", drops_out = "Drops out")
+group_levels <- c(persists = "Persists", drops_out = "Drops out")   # persistence calls shown
 gap <- 3   # empty rows between clusters
 theme_set(theme_minimal(base_size = 8) +
             theme(panel.grid = element_blank(), text = element_text(colour = ink[["primary"]]),
@@ -97,7 +96,8 @@ pairHeatmap <- function(id) {
   lab$y <- as.vector(tapply(y, cl[ord], function(v) mean(range(v)))[lab$cluster])
   lab$text <- sprintf("Cluster %s\n%d %s together", lab$cluster, lab$n, ifelse(lab$n == 1, "pair", "pairs"))
 
-  ## Programs: leading pathway by GSEA, grouped by persistence call, ordered within each group.
+  ## Programs that persist or drop out: leading pathway by GSEA, ordered within each group.
+  prog <- prog[prog$group %in% names(group_levels), , drop = FALSE]
   ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
   Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
   g <- g[g$program %in% prog$program & g$fdr < 0.05, ]
