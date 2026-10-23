@@ -113,21 +113,28 @@ test_that("standardizeActivity scales log1p activity over all samples or within 
   expect_equal(standardizeActivity(A, role)[1, "P1"], 0, ignore_attr = TRUE)
 })
 
-## Step 09 draws the step 08 sample tree for the paired samples only, so the pruned tree must keep the
-## full tree's joins among the samples it keeps.
-test_that("pruneTree keeps the full tree's join heights and leaf order among the kept leaves", {
-  set.seed(3)
-  X <- matrix(stats::rnorm(40), 20, dimnames = list(sprintf("s%02d", 1:20), NULL))
-  tree <- stats::hclust(stats::dist(X), "ward.D2")
-  keep <- sprintf("s%02d", c(1, 2, 5, 8, 9, 13, 17, 20))
-  p <- pruneTree(tree, keep)
+## Step 09 draws each sample cluster with every tumor next to its own organoid, so the tree must join
+## each pair first (tumor on top), keep each cluster whole, and draw every join above its children.
+test_that("pairedTree joins each pair within a cluster first and keeps clusters whole", {
+  X <- rbind(t1 = c(0, 0), o1 = c(3, 0), t2 = c(3.2, 0.1), o2 = c(0.2, 0.1), o4 = c(1.5, 1),
+             t3 = c(10, 10), o3 = c(10.5, 10), t4 = c(12, 10))
+  X <- X[c("o1", "t3", "t1", "o4", "t2", "t4", "o2", "o3"), ]   # input order does not matter
+  cl <- c(t1 = 1, o1 = 1, t2 = 1, o2 = 1, o4 = 1, t3 = 2, o3 = 2, t4 = 2)[rownames(X)]
+  pairs <- data.frame(tumor = c("t1", "t2", "t3", "t4"), organoid = c("o1", "o2", "o3", "o4"))  # t4 and o4 split
+  p <- pairedTree(X, cl, pairs)
   expect_s3_class(p, "hclust")
-  expect_equal(nrow(p$merge), length(keep) - 1)
-  expect_setequal(p$labels, keep)
-  expect_equal(p$labels[p$order], tree$labels[tree$order][tree$labels[tree$order] %in% keep])
-  full <- as.matrix(stats::cophenetic(tree))[keep, keep]
-  expect_equal(as.matrix(stats::cophenetic(p))[keep, keep], full)
-  expect_false(is.unsorted(p$height))
+  expect_equal(nrow(p$merge), nrow(X) - 1)
+  expect_equal(p$labels, rownames(X))
+  ord <- p$labels[p$order]
+  expect_equal(match(c("o1", "o2", "o3"), ord), match(c("t1", "t2", "t3"), ord) + 1)   # t1 lies nearer o2
+  expect_equal(length(rle(cl[ord])$lengths), 2)                                     # clusters contiguous
+  expect_equal(length(unique(paste(stats::cutree(p, k = 2), cl))), 2)
+  leaf_pairs <- apply(p$merge[p$merge[, 1] < 0 & p$merge[, 2] < 0, , drop = FALSE], 1,
+                      function(m) paste(sort(p$labels[-m]), collapse = "-"))
+  expect_true(all(c("o1-t1", "o2-t2", "o3-t3") %in% leaf_pairs))
+  child <- cbind(p$merge[, 1] > 0, p$merge[, 2] > 0)
+  below <- cbind(ifelse(child[, 1], p$height[pmax(p$merge[, 1], 1)], 0), ifelse(child[, 2], p$height[pmax(p$merge[, 2], 1)], 0))
+  expect_true(all(p$height >= below[, 1] & p$height >= below[, 2]))
 })
 
 ## Step 09 groups programs by how they rank Reactome pathways and names each group by a pathway that

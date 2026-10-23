@@ -104,40 +104,60 @@ standardizeActivity <- function(A, role = NULL) {
   Z
 }
 
-#' pruneTree
+#' pairedTree
 #'
-#' A hierarchical tree restricted to some of its leaves: each join between two branches that both hold
-#' kept leaves stays at its height, and the leaves keep their order, so the kept samples are drawn
-#' exactly as they sit in the full tree.
-#' @param tree An [stats::hclust()] tree with labels.
-#' @param keep Labels of the leaves to keep (at least two).
-#' @return An `hclust` tree over the kept leaves.
+#' A sample tree that keeps given clusters whole and joins each tumor-organoid pair within a cluster
+#' first, so every pair is drawn as adjacent leaves (tumor first). Joins are Ward linkage at every
+#' level: the samples of each pair (or of a tumor or organoid linked to two others), then those units
+#' within each cluster, then the clusters, each level from the centroids and sizes of the groups below
+#' it. A sample whose partner sits in another cluster is a unit of its own. A join is raised to its
+#' children's height where needed so the tree draws without crossing lines.
+#' @param X Samples x features, with sample ids as rownames.
+#' @param cluster Cluster of each row of `X`.
+#' @param pairs Data frame with tumor and organoid ids.
+#' @return An `hclust` tree over the rows of `X`; its joins run pairs first, then within each cluster,
+#'   then between clusters, so cutting it into as many groups as there are clusters returns them.
 #' @export
-pruneTree <- function(tree, keep) {
-  kept <- tree$labels %in% keep
-  leaf <- cumsum(kept)
-  m <- tree$merge
-  ref <- integer(nrow(m))   # each join's node in the pruned tree: -leaf, a new join, or 0 when empty
-  merge <- matrix(0L, sum(kept) - 1, 2)
-  height <- numeric(sum(kept) - 1)
-  k <- 0L
-  for (i in seq_len(nrow(m))) {
-    s <- m[i, ] < 0
-    ab <- integer(2)
-    ab[s] <- ifelse(kept[-m[i, s]], -leaf[-m[i, s]], 0L)
-    ab[!s] <- ref[m[i, !s]]
-    if (all(ab != 0)) {
-      k <- k + 1L
-      merge[k, ] <- ab
-      height[k] <- tree$height[i]
-      ref[i] <- k
-    } else {
-      ref[i] <- sum(ab)
-    }
+pairedTree <- function(X, cluster, pairs) {
+  ids <- rownames(X)
+  n <- nrow(X)
+  cluster <- as.vector(cluster)
+  pr <- pairs[pairs$tumor %in% ids & pairs$organoid %in% ids, , drop = FALSE]
+  pr <- pr[cluster[match(pr$tumor, ids)] == cluster[match(pr$organoid, ids)], , drop = FALSE]
+  unit <- seq_len(n)
+  if (nrow(pr)) {
+    comp <- igraph::components(igraph::graph_from_data_frame(pr[c("tumor", "organoid")], directed = FALSE))$membership
+    unit[match(names(comp), ids)] <- n + comp
   }
-  structure(list(merge = merge, height = height, order = leaf[tree$order[kept[tree$order]]],
-                 labels = tree$labels[kept], method = tree$method, call = match.call(),
-                 dist.method = tree$dist.method), class = "hclust")
+  merge <- matrix(0L, 0, 2)
+  height <- numeric(0)
+  ## Joins groups (nodes: -row for a sample, a join's index otherwise) by Ward linkage, starting from the
+  ## Ward distance between their centroids, sqrt(2 n_a n_b / (n_a + n_b)) times the Euclidean distance.
+  join <- function(nodes, rows) {
+    if (length(nodes) == 1) return(nodes)
+    size <- lengths(rows)
+    centroid <- do.call(rbind, lapply(rows, function(r) colMeans(X[r, , drop = FALSE])))
+    W <- as.matrix(stats::dist(centroid)) * sqrt(2 * outer(size, size) / outer(size, size, "+"))
+    h <- stats::hclust(stats::as.dist(W), method = "ward.D2", members = size)
+    m <- h$merge
+    m[h$merge < 0] <- nodes[-h$merge[h$merge < 0]]
+    m[h$merge > 0] <- h$merge[h$merge > 0] + nrow(merge)
+    merge <<- rbind(merge, m)
+    height <<- c(height, h$height)
+    nrow(merge)
+  }
+  o <- order(unit, !(ids %in% pairs$tumor))   # tumors first within a pair
+  units <- split(o, unit[o])
+  unit_node <- vapply(units, function(r) join(-r, as.list(r)), numeric(1))
+  by_cluster <- split(seq_along(units), cluster[vapply(units, `[`, integer(1), 1)])
+  cluster_rows <- lapply(by_cluster, function(u) unlist(units[u], use.names = FALSE))
+  cluster_node <- vapply(by_cluster, function(u) join(unit_node[u], units[u]), numeric(1))
+  join(cluster_node, cluster_rows)
+  for (i in seq_len(nrow(merge))) height[i] <- max(height[i], height[merge[i, merge[i, ] > 0]])
+  leaves <- function(i) if (i < 0) -i else c(leaves(merge[i, 1]), leaves(merge[i, 2]))
+  storage.mode(merge) <- "integer"
+  structure(list(merge = merge, height = height, order = leaves(nrow(merge)), labels = ids, method = "ward.D2",
+                 call = match.call(), dist.method = "euclidean"), class = "hclust")
 }
 
 #' clusterActivity

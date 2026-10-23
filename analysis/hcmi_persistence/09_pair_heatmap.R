@@ -4,8 +4,9 @@
 ## Reads step 08's outputs under results/align (out-of-fold activity in combined.rds, the sample clusters,
 ## the persistence map and the GSEA table); refits nothing. The tree and clusters are step 08's: a Ward tree
 ## on the transferring programs standardized within tumors and within organoids (standardizeActivity()),
-## cut into k clusters. Rows are the tumors and organoids in a pair, drawn as they sit in that tree
-## (pruneTree()), with a gap between clusters; each cluster is labeled with the pairs it holds together.
+## cut into k clusters. Rows are the tumors and organoids in a pair, under a tree that keeps those clusters
+## and joins each pair within a cluster first (pairedTree()), so a pair the clusters hold together sits on
+## adjacent rows, tumor above organoid; a gap separates clusters, each labeled with the pairs it holds together.
 ## Columns are the stable programs that persist, cut into k_programs groups by how they rank Reactome
 ## pathways (pathwayClusters() on the preranked GSEA), each named by the pathway that sets it apart; within a
 ## group, programs follow the cluster where they peak.
@@ -78,14 +79,16 @@ pairHeatmap <- function(id) {
   ## Step 08's tree and clusters, checked against the clusters it wrote.
   transferring <- prog$program[prog$group %in% c("persists", "reduced_concordant")]
   if (length(transferring) < 2) transferring <- prog$program
-  tree <- stats::hclust(stats::dist(standardizeActivity(out$oof[, transferring, drop = FALSE], role)), "ward.D2")
+  Zt <- standardizeActivity(out$oof[, transferring, drop = FALSE], role)
+  tree <- stats::hclust(stats::dist(Zt), "ward.D2")
   cl <- stats::cutree(tree, k = k_clusters)
   saved <- as.data.frame(fread(file.path(align_dir, id, sprintf("sample_clusters_k%d.csv", k_clusters))))
   if (!identical(unname(cl[saved$sample]), as.integer(saved$cluster))) stop(id, ": clusters differ from step 08's")
 
-  ## Paired samples only, in tree order, with a gap where the cluster changes.
+  ## Paired samples only, each pair joined first within its cluster, with a gap where the cluster changes.
   pr <- pairs[pairs$organoid %in% sid & pairs$tumor %in% sid, ]
-  ptree <- pruneTree(tree, unique(c(pr$tumor, pr$organoid)))
+  keep <- unique(c(pr$tumor, pr$organoid))
+  ptree <- pairedTree(Zt[keep, , drop = FALSE], cl[keep], pr)
   ord <- ptree$labels[ptree$order]
   block <- cumsum(c(1, diff(cl[ord]) != 0))
   pos <- seq_along(ord) + gap * (block - 1)
