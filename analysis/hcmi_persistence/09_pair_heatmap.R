@@ -24,12 +24,9 @@ title <- stats::setNames(ifelse(t1$baseline, "plain NMF (baseline)",
                                 sprintf("GRACKLE, %s sample graph alpha_1 = %s, %s gene graph alpha_2 = %s",
                                         t1$sample_graph, t1$alpha_1, t1$arm, t1$alpha_2)), ids)
 
-## Colors from the dataviz reference palette: its eight categorical slots in order for the clusters,
-## diverging blue-red with its neutral midpoint for activity (fixed limits so the two figures compare
-## directly), neutral inks for role.
+## Colors from the dataviz reference palette: diverging blue-red with its neutral midpoint for activity
+## (fixed limits so the two figures compare directly), neutral inks for role.
 ink <- c(primary = "#0b0b0b", secondary = "#52514e", baseline = "#c3c2b7", surface = "#fcfcfb")
-categorical <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948")
-if (k_clusters > length(categorical)) stop("at most ", length(categorical), " clusters have their own color")
 diverging <- c(low = "#2a78d6", mid = "#f0efec", high = "#e34948")
 role_cols <- c(Tumor = ink[["secondary"]], Organoid = ink[["baseline"]])
 group_levels <- c(persists = "Persists", reduced_concordant = "Reduced,\nconcordant",
@@ -93,15 +90,14 @@ pairHeatmap <- function(id) {
   pos <- seq_along(ord) + gap * (block - 1)
   y <- stats::setNames(max(pos) + 1 - pos, ord)
   r <- role[match(ord, sid)]
-  side <- data.frame(y = y, cluster = factor(cl[ord], levels = seq_len(k_clusters)),
-                     role = factor(ifelse(r == "tumor", "Tumor", "Organoid"), levels = names(role_cols)))
+  side <- data.frame(y = y, role = factor(ifelse(r == "tumor", "Tumor", "Organoid"), levels = names(role_cols)))
   together <- table(factor(cl[pr$tumor][cl[pr$tumor] == cl[pr$organoid]], levels = seq_len(k_clusters)))
   lab <- data.frame(cluster = names(together), n = as.vector(together))
   lab <- lab[lab$cluster %in% cl[ord], ]   # a cluster of unpaired tumors only has no rows
   lab$y <- as.vector(tapply(y, cl[ord], function(v) mean(range(v)))[lab$cluster])
   lab$text <- sprintf("Cluster %s\n%d %s together", lab$cluster, lab$n, ifelse(lab$n == 1, "pair", "pairs"))
 
-  ## Programs: leading pathway by GSEA, grouped by persistence call, ordered by a tree within each group.
+  ## Programs: leading pathway by GSEA, grouped by persistence call, ordered within each group.
   ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
   Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
   g <- g[g$program %in% prog$program & g$fdr < 0.05, ]
@@ -128,14 +124,8 @@ pairHeatmap <- function(id) {
   p_tree <- ggplot(treeSegments(ptree, y[ptree$labels])) +
     geom_segment(aes(x = x, xend = xend, y = y, yend = yend), linewidth = 0.2, colour = ink[["secondary"]]) +
     scale_x_reverse(expand = c(0, 0)) + ys + labs(x = NULL) + bare + theme(axis.text.x = element_blank())
-  strip <- function(label) {
-    ggplot(side, aes(x = label, y = y)) + ys + labs(x = NULL) + bare +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]]))
-  }
-  p_cluster <- strip("Sample cluster") +
-    geom_tile(aes(fill = cluster), height = 1) +
-    scale_fill_manual(values = categorical[seq_len(k_clusters)], guide = "none")
-  p_role <- strip("Tumor or organoid") +
+  p_role <- ggplot(side, aes(x = "Tumor or organoid", y = y)) + ys + labs(x = NULL) + bare +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]])) +
     geom_tile(aes(fill = role), height = 1) +
     scale_fill_manual(values = role_cols, name = NULL)
   p_hm <- ggplot(hm, aes(label, y, fill = pmax(pmin(z, 2.5), -2.5))) +
@@ -148,8 +138,8 @@ pairHeatmap <- function(id) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
           strip.clip = "off", panel.spacing.x = grid::unit(3, "pt"))
 
-  fig <- (p_lab + p_tree + p_cluster + p_role + p_hm +
-            plot_layout(widths = c(4, 3, 0.6, 0.6, nrow(prog)), guides = "collect")) +
+  fig <- (p_lab + p_tree + p_role + p_hm +
+            plot_layout(widths = c(4, 3, 0.6, nrow(prog)), guides = "collect")) +
     plot_annotation(title = sprintf("Paired tumors and organoids by sample cluster: %s", title[[id]])) &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
