@@ -104,6 +104,42 @@ standardizeActivity <- function(A, role = NULL) {
   Z
 }
 
+#' pruneTree
+#'
+#' A hierarchical tree restricted to some of its leaves: each join between two branches that both hold
+#' kept leaves stays at its height, and the leaves keep their order, so the kept samples are drawn
+#' exactly as they sit in the full tree.
+#' @param tree An [stats::hclust()] tree with labels.
+#' @param keep Labels of the leaves to keep (at least two).
+#' @return An `hclust` tree over the kept leaves.
+#' @export
+pruneTree <- function(tree, keep) {
+  kept <- tree$labels %in% keep
+  leaf <- cumsum(kept)
+  m <- tree$merge
+  ref <- integer(nrow(m))   # each join's node in the pruned tree: -leaf, a new join, or 0 when empty
+  merge <- matrix(0L, sum(kept) - 1, 2)
+  height <- numeric(sum(kept) - 1)
+  k <- 0L
+  for (i in seq_len(nrow(m))) {
+    s <- m[i, ] < 0
+    ab <- integer(2)
+    ab[s] <- ifelse(kept[-m[i, s]], -leaf[-m[i, s]], 0L)
+    ab[!s] <- ref[m[i, !s]]
+    if (all(ab != 0)) {
+      k <- k + 1L
+      merge[k, ] <- ab
+      height[k] <- tree$height[i]
+      ref[i] <- k
+    } else {
+      ref[i] <- sum(ab)
+    }
+  }
+  structure(list(merge = merge, height = height, order = leaf[tree$order[kept[tree$order]]],
+                 labels = tree$labels[kept], method = tree$method, call = match.call(),
+                 dist.method = tree$dist.method), class = "hclust")
+}
+
 #' clusterActivity
 #'
 #' Mean program activity of the tumors and of the organoids in each sample cluster. Activity is

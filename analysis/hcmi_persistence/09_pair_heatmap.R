@@ -1,15 +1,17 @@
-## Step 09: sample tree and program heatmap for the selected pair-alignment setting and the baseline.
-##   Rscript analysis/hcmi_persistence/09_pair_heatmap.R
-## Reads step 08's outputs under results/align (out-of-fold activity in combined.rds, the persistence map
-## and the GSEA table); refits nothing. Rows are every held-out tumor and organoid, ordered by a Ward tree
-## on all stable programs standardized within tumors and within organoids (standardizeActivity(); the
-## clustering step 08 compares across settings). Beside the tree: each sample's role and one color per
-## tumor-organoid pair (samples linked through a shared tumor or organoid share it; unpaired tumors are
-## blank), so a pair the tree places together shows as adjacent rows of one color. Columns are the stable
-## programs, named by their leading Reactome pathway (preranked GSEA) and grouped by persistence call.
+## Step 09: paired tumors and organoids by sample cluster, for the selected pair-alignment setting and the
+## baseline.
+##   Rscript analysis/hcmi_persistence/09_pair_heatmap.R [--k_clusters 8]
+## Reads step 08's outputs under results/align (out-of-fold activity in combined.rds, the sample clusters,
+## the persistence map and the GSEA table); refits nothing. The tree and clusters are step 08's: a Ward tree
+## on the transferring programs standardized within tumors and within organoids (standardizeActivity()),
+## cut into k clusters. Rows are the tumors and organoids in a pair, drawn as they sit in that tree
+## (pruneTree()), with a gap between clusters; each cluster is labeled with the pairs it holds together.
+## Columns are the stable programs, named by their leading Reactome pathway (preranked GSEA) and grouped
+## by persistence call, each group ordered by the cluster where a program peaks.
 source("analysis/hcmi_persistence/config.R")
 suppressPackageStartupMessages({ library(ggplot2); library(patchwork) })
-invisible(parseArgs(list()))
+args <- parseArgs(list(k_clusters = "8"))
+k_clusters <- as.integer(args$k_clusters)
 align_dir <- file.path(cfg$run, "results", "align")
 fig_dir <- file.path(align_dir, "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
@@ -22,13 +24,17 @@ title <- stats::setNames(ifelse(t1$baseline, "plain NMF (baseline)",
                                 sprintf("GRACKLE, %s sample graph alpha_1 = %s, %s gene graph alpha_2 = %s",
                                         t1$sample_graph, t1$alpha_1, t1$arm, t1$alpha_2)), ids)
 
-## Colors from the dataviz reference palette: diverging blue-red with its neutral midpoint for activity,
-## fixed limits so the two figures compare directly; neutral inks for role so the pair colors stand out.
+## Colors from the dataviz reference palette: its eight categorical slots in order for the clusters,
+## diverging blue-red with its neutral midpoint for activity (fixed limits so the two figures compare
+## directly), neutral inks for role.
 ink <- c(primary = "#0b0b0b", secondary = "#52514e", baseline = "#c3c2b7", surface = "#fcfcfb")
+categorical <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948")
+if (k_clusters > length(categorical)) stop("at most ", length(categorical), " clusters have their own color")
 diverging <- c(low = "#2a78d6", mid = "#f0efec", high = "#e34948")
 role_cols <- c(Tumor = ink[["secondary"]], Organoid = ink[["baseline"]])
 group_levels <- c(persists = "Persists", reduced_concordant = "Reduced,\nconcordant",
                   present_not_patient_specific = "Present, not\npatient-specific", drops_out = "Drops out")
+gap <- 3   # empty rows between clusters
 theme_set(theme_minimal(base_size = 8) +
             theme(panel.grid = element_blank(), text = element_text(colour = ink[["primary"]]),
                   axis.text = element_text(colour = ink[["secondary"]]),
@@ -48,12 +54,9 @@ pathwayLabel <- function(x, n = 40) {
   ifelse(nchar(s) > n, paste0(substr(s, 1, n - 1), "…"), s)
 }
 
-## Tree segments with leaves at x = 0 and leaf i of tree$order at y = n + 1 - i (first leaf on top).
-## Merges are processed in order, so each child's position is known before its parent's.
-treeSegments <- function(tree) {
-  n <- length(tree$order)
-  leaf_y <- integer(n)
-  leaf_y[tree$order] <- n + 1 - seq_len(n)
+## Tree segments with leaves at x = 0 and leaf i (in label order) at y = leaf_y[i]. Merges are processed
+## in order, so each child's position is known before its parent's.
+treeSegments <- function(tree, leaf_y) {
   m <- tree$merge
   pos <- numeric(nrow(m))
   segs <- vector("list", nrow(m))
@@ -67,60 +70,74 @@ treeSegments <- function(tree) {
   do.call(rbind, segs)
 }
 
-## One color per pair, assigned down the tree with hues a golden angle apart and three lightness steps,
-## so neighboring pairs never share a look.
-pairColors <- function(k) {
-  i <- seq_len(k)
-  grDevices::hcl(h = (i * 137.508) %% 360, c = 65, l = c(52, 72, 62)[(i %% 3) + 1])
-}
-
 pairHeatmap <- function(id) {
   out <- readRDS(file.path(align_dir, id, "combined.rds"))
   g <- as.data.frame(fread(file.path(align_dir, id, "gsea.csv")))
   prog <- out$programs[out$programs$stable %in% TRUE, , drop = FALSE]
   sid <- rownames(out$oof)
   role <- samples$role[match(sid, samples$profile_id)]
-  Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
-  tree <- stats::hclust(stats::dist(Z), method = "ward.D2")
-  n <- length(sid)
-  y <- integer(n)
-  y[tree$order] <- n + 1 - seq_len(n)
 
-  ## Pairs: connected tumors and organoids share a color, numbered in tree order.
+  ## Step 08's tree and clusters, checked against the clusters it wrote.
+  transferring <- prog$program[prog$group %in% c("persists", "reduced_concordant")]
+  if (length(transferring) < 2) transferring <- prog$program
+  tree <- stats::hclust(stats::dist(standardizeActivity(out$oof[, transferring, drop = FALSE], role)), "ward.D2")
+  cl <- stats::cutree(tree, k = k_clusters)
+  saved <- as.data.frame(fread(file.path(align_dir, id, sprintf("sample_clusters_k%d.csv", k_clusters))))
+  if (!identical(unname(cl[saved$sample]), as.integer(saved$cluster))) stop(id, ": clusters differ from step 08's")
+
+  ## Paired samples only, in tree order, with a gap where the cluster changes.
   pr <- pairs[pairs$organoid %in% sid & pairs$tumor %in% sid, ]
-  comp <- igraph::components(igraph::graph_from_data_frame(pr[c("tumor", "organoid")], directed = FALSE))$membership
-  first <- unique(comp[intersect(sid[tree$order], names(comp))])
-  pair_rank <- match(comp[sid], first)
-  side <- data.frame(y = y, role = factor(ifelse(role == "tumor", "Tumor", "Organoid"), levels = names(role_cols)),
-                     pair = ifelse(is.na(pair_rank), NA, pairColors(length(first))[pair_rank]))
+  ptree <- pruneTree(tree, unique(c(pr$tumor, pr$organoid)))
+  ord <- ptree$labels[ptree$order]
+  block <- cumsum(c(1, diff(cl[ord]) != 0))
+  pos <- seq_along(ord) + gap * (block - 1)
+  y <- stats::setNames(max(pos) + 1 - pos, ord)
+  r <- role[match(ord, sid)]
+  side <- data.frame(y = y, cluster = factor(cl[ord], levels = seq_len(k_clusters)),
+                     role = factor(ifelse(r == "tumor", "Tumor", "Organoid"), levels = names(role_cols)))
+  together <- table(factor(cl[pr$tumor][cl[pr$tumor] == cl[pr$organoid]], levels = seq_len(k_clusters)))
+  lab <- data.frame(cluster = names(together), n = as.vector(together))
+  lab <- lab[lab$cluster %in% cl[ord], ]   # a cluster of unpaired tumors only has no rows
+  lab$y <- as.vector(tapply(y, cl[ord], function(v) mean(range(v)))[lab$cluster])
+  lab$text <- sprintf("Cluster %s\n%d %s together", lab$cluster, lab$n, ifelse(lab$n == 1, "pair", "pairs"))
 
   ## Programs: leading pathway by GSEA, grouped by persistence call, ordered by a tree within each group.
+  ## Activity is standardized within tumors and within organoids over all held-out samples, as for the tree.
+  Z <- standardizeActivity(out$oof[, prog$program, drop = FALSE], role)
   g <- g[g$program %in% prog$program & g$fdr < 0.05, ]
   g <- g[order(g$program, g$fdr, -g$nes), ]
   lead <- g[!duplicated(g$program), ]
   prog$label <- paste(prog$program, ifelse(prog$program %in% lead$program,
                                            pathwayLabel(lead$gene_set[match(prog$program, lead$program)]), "(no pathway)"))
-  col_tree <- stats::hclust(stats::dist(t(Z)), method = "ward.D2")
+  ## Within each group, programs follow the cluster (top to bottom) where their mean activity peaks.
+  cmean <- rowsum(Z[ord, , drop = FALSE], block) / as.vector(table(block))
   prog$group <- factor(prog$group, levels = names(group_levels), labels = group_levels)
-  prog <- prog[order(prog$group, match(prog$program, colnames(Z)[col_tree$order])), ]
-  hm <- data.frame(y = rep(y, times = ncol(Z)), program = rep(colnames(Z), each = n), z = as.vector(Z))
+  peak <- apply(cmean[, prog$program, drop = FALSE], 2, which.max)
+  prog <- prog[order(prog$group, peak, -apply(cmean[, prog$program, drop = FALSE], 2, max)), ]
+  hm <- data.frame(y = rep(y, times = ncol(Z)), program = rep(colnames(Z), each = length(ord)),
+                   z = as.vector(Z[ord, ]))
   hm$label <- factor(prog$label[match(hm$program, prog$program)], levels = prog$label)
   hm$group <- prog$group[match(hm$program, prog$program)]
 
-  ys <- scale_y_continuous(limits = c(0.5, n + 0.5), expand = c(0, 0))
+  ys <- scale_y_continuous(limits = c(0.5, max(y) + 0.5), expand = c(0, 0))
   bare <- theme(axis.text.y = element_blank(), axis.title.y = element_blank())
-  p_tree <- ggplot(treeSegments(tree)) +
+  p_lab <- ggplot(lab, aes(x = 1, y = y, label = text)) +
+    geom_text(hjust = 1, size = 2.5, lineheight = 0.9, colour = ink[["primary"]]) +
+    scale_x_continuous(limits = c(0, 1), expand = c(0, 0)) + ys + coord_cartesian(clip = "off") + labs(x = NULL) + bare +
+    theme(axis.text.x = element_blank())
+  p_tree <- ggplot(treeSegments(ptree, y[ptree$labels])) +
     geom_segment(aes(x = x, xend = xend, y = y, yend = yend), linewidth = 0.2, colour = ink[["secondary"]]) +
     scale_x_reverse(expand = c(0, 0)) + ys + labs(x = NULL) + bare + theme(axis.text.x = element_blank())
-  strip <- function(fill_col, label) {
+  strip <- function(label) {
     ggplot(side, aes(x = label, y = y)) + ys + labs(x = NULL) + bare +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]]))
   }
-  p_role <- strip("role", "Tumor or organoid") +
+  p_cluster <- strip("Sample cluster") +
+    geom_tile(aes(fill = cluster), height = 1) +
+    scale_fill_manual(values = categorical[seq_len(k_clusters)], guide = "none")
+  p_role <- strip("Tumor or organoid") +
     geom_tile(aes(fill = role), height = 1) +
     scale_fill_manual(values = role_cols, name = NULL)
-  p_pair <- strip("pair", "Pair") +
-    geom_tile(data = side[!is.na(side$pair), ], aes(fill = I(pair)), height = 1)
   p_hm <- ggplot(hm, aes(label, y, fill = pmax(pmin(z, 2.5), -2.5))) +
     geom_tile(height = 1) +
     scale_fill_gradient2(low = diverging[["low"]], mid = diverging[["mid"]], high = diverging[["high"]],
@@ -131,8 +148,9 @@ pairHeatmap <- function(id) {
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1, colour = ink[["primary"]], size = 6.5),
           strip.clip = "off", panel.spacing.x = grid::unit(3, "pt"))
 
-  fig <- (p_tree + p_role + p_pair + p_hm + plot_layout(widths = c(4, 0.4, 0.4, nrow(prog)), guides = "collect")) +
-    plot_annotation(title = sprintf("Tumors and organoids by program activity: %s", title[[id]])) &
+  fig <- (p_lab + p_tree + p_cluster + p_role + p_hm +
+            plot_layout(widths = c(4, 3, 0.6, 0.6, nrow(prog)), guides = "collect")) +
+    plot_annotation(title = sprintf("Paired tumors and organoids by sample cluster: %s", title[[id]])) &
     theme(legend.position = "right", plot.background = element_rect(fill = ink[["surface"]], colour = NA))
   name <- file.path(fig_dir, sprintf("pair_heatmap_%s", id))
   ggsave(paste0(name, ".pdf"), fig, width = 12, height = 12, device = grDevices::cairo_pdf)
